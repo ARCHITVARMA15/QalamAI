@@ -10,7 +10,7 @@ interface Props {
   onRedo: () => void;
 }
 
- function EditorToolbar({ wordCount, isSaved, onFormat, onUndo, onRedo }: Props) {
+function EditorToolbar({ wordCount, isSaved, onFormat, onUndo, onRedo }: Props) {
   const [fontSize, setFontSize] = useState("16");
   const [showFontMenu, setShowFontMenu] = useState(false);
 
@@ -20,17 +20,17 @@ interface Props {
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "space-between",
       padding: "0 1rem", height: "44px",
-      background: "#faf7f4", borderBottom: "1px solid #e8e2d9",
+      background: "#fef6ee", borderTop: "1px solid #e8e2d9",
       gap: "0.25rem", flexShrink: 0,
     }}>
       {/* Left: formatting tools */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.1rem" }}>
         {/* Undo/Redo */}
         <ToolBtn onClick={onUndo} title="Undo (⌘Z)">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 7v6h6" /><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13" /></svg>
         </ToolBtn>
         <ToolBtn onClick={onRedo} title="Redo (⌘⇧Z)">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 7v6h-6" /><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7" /></svg>
         </ToolBtn>
 
         <Divider />
@@ -48,7 +48,7 @@ interface Props {
         {/* Highlight */}
         <ToolBtn onClick={formatBtn("hiliteColor", "#fff3cd")} title="Highlight">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
           </svg>
         </ToolBtn>
 
@@ -67,7 +67,7 @@ interface Props {
             }}
           >
             Aa
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6,9 12,15 18,9"/></svg>
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6,9 12,15 18,9" /></svg>
           </button>
           {showFontMenu && (
             <div style={{
@@ -104,13 +104,13 @@ interface Props {
         {/* Lists */}
         <ToolBtn onClick={formatBtn("insertUnorderedList")} title="Bullet List">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-            <circle cx="3" cy="6" r="1" fill="currentColor"/><circle cx="3" cy="12" r="1" fill="currentColor"/><circle cx="3" cy="18" r="1" fill="currentColor"/>
+            <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+            <circle cx="3" cy="6" r="1" fill="currentColor" /><circle cx="3" cy="12" r="1" fill="currentColor" /><circle cx="3" cy="18" r="1" fill="currentColor" />
           </svg>
         </ToolBtn>
         <ToolBtn onClick={formatBtn("insertOrderedList")} title="Numbered List">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/>
+            <line x1="10" y1="6" x2="21" y2="6" /><line x1="10" y1="12" x2="21" y2="12" /><line x1="10" y1="18" x2="21" y2="18" />
             <text x="1" y="8" style={{ fontSize: "8px" }} fill="currentColor" stroke="none">1.</text>
           </svg>
         </ToolBtn>
@@ -120,7 +120,7 @@ interface Props {
         {/* Clear format */}
         <ToolBtn onClick={formatBtn("removeFormat")} title="Clear Formatting">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 6v6m0 0v6m0-6h6m-6 0H6"/><circle cx="18" cy="18" r="3"/>
+            <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" /><circle cx="18" cy="18" r="3" />
           </svg>
         </ToolBtn>
       </div>
@@ -133,7 +133,7 @@ interface Props {
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.78rem", color: isSaved ? "#27ae60" : "#9e9589" }}>
           {isSaved ? (
             <>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20,6 9,17 4,12" /></svg>
               Saved
             </>
           ) : (
@@ -162,12 +162,13 @@ function ToolBtn({ onClick, title, children }: { onClick: () => void; title?: st
       onClick={onClick} title={title}
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{
-        width: "28px", height: "28px", borderRadius: "6px",
-        border: "none", background: h ? "#f0ebe3" : "transparent",
-        cursor: "pointer", color: "#4a4540",
+        width: "32px", height: "32px", borderRadius: "50%",
+        border: "none", background: h ? "rgba(4,120,87,0.1)" : "transparent",
+        cursor: "pointer", color: h ? "#047857" : "#4a4540",
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: "0.78rem", fontFamily: "'DM Sans', sans-serif",
-        transition: "background 0.1s", flexShrink: 0,
+        transition: "all 0.2s ease", flexShrink: 0,
+        transform: h ? "scale(1.1)" : "scale(1)",
       }}
     >
       {children}

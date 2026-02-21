@@ -21,7 +21,7 @@ const defaultChapters: Chapter[] = [
   { id: "c1", title: "Untitled Document", wordCount: 0, active: true },
 ];
 
- function LeftSidebar({ projectTitle, projectEmoji, onBack, collapsed, onToggleCollapse }: Props) {
+function LeftSidebar({ projectTitle, projectEmoji, onBack, collapsed, onToggleCollapse }: Props) {
   const [chapters, setChapters] = useState<Chapter[]>(defaultChapters);
   const [activeChapter, setActiveChapter] = useState("c1");
   const [storyBible, setStoryBible] = useState(true);
@@ -40,13 +40,13 @@ const defaultChapters: Chapter[] = [
   if (collapsed) {
     return (
       <aside style={{
-        width: "48px", background: "#faf7f4",
+        width: "48px", background: "linear-gradient(180deg, #fef6ee 0%, #fceee0 100%)",
         borderRight: "1px solid #e8e2d9",
         display: "flex", flexDirection: "column", alignItems: "center",
         padding: "1rem 0", gap: "1rem", flexShrink: 0,
       }}>
         <button onClick={onToggleCollapse} style={iconBtnStyle} title="Expand sidebar">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
         </button>
       </aside>
     );
@@ -54,7 +54,7 @@ const defaultChapters: Chapter[] = [
 
   return (
     <aside style={{
-      width: "260px", background: "#faf7f4",
+      width: "260px", background: "linear-gradient(180deg, #fef6ee 0%, #fceee0 100%)",
       borderRight: "1px solid #e8e2d9",
       display: "flex", flexDirection: "column",
       flexShrink: 0, overflow: "hidden",
@@ -73,7 +73,7 @@ const defaultChapters: Chapter[] = [
           onMouseEnter={e => (e.currentTarget.style.color = "#1a1510")}
           onMouseLeave={e => (e.currentTarget.style.color = "#9e9589")}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
           Back
         </button>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -87,7 +87,7 @@ const defaultChapters: Chapter[] = [
             </span>
           </div>
           <button onClick={onToggleCollapse} style={iconBtnStyle} title="Collapse">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
           </button>
         </div>
       </div>
@@ -99,12 +99,12 @@ const defaultChapters: Chapter[] = [
           style={{
             flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem",
             padding: "0.45rem 0", borderRadius: "8px",
-            background: "#1a1510", color: "#fff", border: "none",
+            background: "#047857", color: "#fff", border: "none",
             fontFamily: "'DM Sans', sans-serif", fontSize: "0.78rem", fontWeight: 500,
             cursor: "pointer", transition: "background 0.2s",
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = "#c96a3b")}
-          onMouseLeave={e => (e.currentTarget.style.background = "#1a1510")}
+          onMouseEnter={e => (e.currentTarget.style.background = "#065f46")}
+          onMouseLeave={e => (e.currentTarget.style.background = "#047857")}
         >
           <span style={{ fontSize: "1rem" }}>+</span> New
         </button>
@@ -133,7 +133,7 @@ const defaultChapters: Chapter[] = [
               placeholder="Chapter name…"
               style={{
                 width: "100%", padding: "0.4rem 0.6rem",
-                border: "1.5px solid #c96a3b", borderRadius: "6px",
+                border: "1.5px solid #047857", borderRadius: "6px",
                 fontFamily: "'DM Sans', sans-serif", fontSize: "0.82rem",
                 background: "#fff", color: "#1a1510", outline: "none",
               }}
@@ -147,17 +147,18 @@ const defaultChapters: Chapter[] = [
             style={{
               width: "100%", display: "flex", alignItems: "center", gap: "0.5rem",
               padding: "0.55rem 0.75rem", borderRadius: "8px", border: "none",
-              background: activeChapter === ch.id ? "rgba(201,106,59,0.08)" : "transparent",
-              color: activeChapter === ch.id ? "#c96a3b" : "#4a4540",
+              borderLeft: activeChapter === ch.id ? "3px solid #047857" : "3px solid transparent",
+              background: activeChapter === ch.id ? "rgba(4,120,87,0.08)" : "transparent",
+              color: activeChapter === ch.id ? "#047857" : "#4a4540",
               fontFamily: "'DM Sans', sans-serif", fontSize: "0.83rem",
-              cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+              cursor: "pointer", textAlign: "left", transition: "all 0.2s ease",
             }}
             onMouseEnter={e => { if (activeChapter !== ch.id) e.currentTarget.style.background = "#f5f1eb"; }}
             onMouseLeave={e => { if (activeChapter !== ch.id) e.currentTarget.style.background = "transparent"; }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14,2 14,8 20,8"/>
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14,2 14,8 20,8" />
             </svg>
             <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ch.title}</span>
           </button>
@@ -176,7 +177,7 @@ const defaultChapters: Chapter[] = [
           onClick={() => setStoryBible(!storyBible)}
           style={{
             width: "38px", height: "22px", borderRadius: "11px", border: "none",
-            background: storyBible ? "#c96a3b" : "#d4cdc5",
+            background: storyBible ? "#047857" : "#d4cdc5",
             cursor: "pointer", position: "relative", transition: "background 0.25s",
           }}
         >

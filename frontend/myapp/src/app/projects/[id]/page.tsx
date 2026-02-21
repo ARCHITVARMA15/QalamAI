@@ -869,10 +869,10 @@ export default function ProjectEditorPage() {
   // ─── Not found / loading states ──────────────────────────────────────────────
   if (notFound) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#faf7f4", flexDirection: "column", gap: "1rem" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#fef6ee", flexDirection: "column", gap: "1rem" }}>
         <div style={{ fontSize: "3rem" }}>🔍</div>
         <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.5rem", color: "#1a1510" }}>Project not found</h2>
-        <button onClick={() => router.push("/projects")} style={{ padding: "0.6rem 1.2rem", borderRadius: "10px", border: "none", background: "#1a1510", color: "#fff", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+        <button onClick={() => router.push("/projects")} style={{ padding: "0.6rem 1.2rem", borderRadius: "10px", border: "none", background: "#047857", color: "#fff", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
           ← Back to Projects
         </button>
       </div>
@@ -881,8 +881,8 @@ export default function ProjectEditorPage() {
 
   if (!project) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#faf7f4" }}>
-        <div style={{ width: "32px", height: "32px", borderRadius: "50%", border: "3px solid #e8e2d9", borderTopColor: "#c96a3b", animation: "spin 0.8s linear infinite" }} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#fef6ee" }}>
+        <div style={{ width: "32px", height: "32px", borderRadius: "50%", border: "3px solid #e8e2d9", borderTopColor: "#047857", animation: "spin 0.8s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -893,7 +893,7 @@ export default function ProjectEditorPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'DM Sans', sans-serif; background: #faf7f4; }
+        body { font-family: 'DM Sans', sans-serif; background: #fef6ee; }
         .editor-content { outline: none; min-height: 60vh; font-weight: 400; }
         .editor-content:empty::before { content: 'Type here…'; color: #b8b0a4; font-style: italic; font-weight: 400; }
         .editor-content h1 { font-family: 'DM Serif Display', serif; font-size: 2rem; margin-bottom: 1rem; font-weight: normal; }
@@ -915,7 +915,7 @@ export default function ProjectEditorPage() {
       <nav style={{
         display: "flex", alignItems: "center",
         padding: "0 1.5rem", height: "52px",
-        background: "rgba(250,247,244,0.95)", backdropFilter: "blur(12px)",
+        background: "rgba(254,246,238,0.95)", backdropFilter: "blur(12px)",
         borderBottom: "1px solid #e8e2d9",
         position: "sticky", top: 0, zIndex: 50, gap: "0.75rem",
       }}>
@@ -933,7 +933,10 @@ export default function ProjectEditorPage() {
 
         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
           <span style={{ fontSize: "1rem" }}>{project.emoji}</span>
-          <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "0.95rem", color: "#1a1510" }}>{project.title}</span>
+          <span style={{
+            fontFamily: "'DM Serif Display', serif", fontSize: "0.95rem", color: "#1a1510",
+            borderBottom: "2px solid #047857", paddingBottom: "2px",
+          }}>{project.title}</span>
         </div>
 
         <div style={{ flex: 1 }} />
@@ -942,7 +945,7 @@ export default function ProjectEditorPage() {
         <button
           onClick={() => router.push(`/projects/${projectId}/insight`)}
           style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.4rem 0.9rem", borderRadius: "8px", border: "1.5px solid #e8e2d9", background: "#fff", color: "#4a4540", fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", cursor: "pointer", transition: "all 0.2s" }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = "#c96a3b"; e.currentTarget.style.color = "#c96a3b"; e.currentTarget.style.background = "rgba(201,106,59,0.04)"; }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = "#047857"; e.currentTarget.style.color = "#047857"; e.currentTarget.style.background = "rgba(4,120,87,0.04)"; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = "#e8e2d9"; e.currentTarget.style.color = "#4a4540"; e.currentTarget.style.background = "#fff"; }}
         >
           🕸️ Insight
@@ -979,7 +982,7 @@ export default function ProjectEditorPage() {
         {/* Upload button */}
         <button
           onClick={() => setShowUploadPanel(!showUploadPanel)}
-          style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.4rem 0.9rem", borderRadius: "8px", border: showUploadPanel ? "1.5px solid #c96a3b" : "1.5px solid #e8e2d9", background: showUploadPanel ? "rgba(201,106,59,0.06)" : "#fff", color: showUploadPanel ? "#c96a3b" : "#4a4540", fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", cursor: "pointer", transition: "all 0.15s" }}
+          style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.4rem 0.9rem", borderRadius: "8px", border: showUploadPanel ? "1.5px solid #047857" : "1.5px solid #e8e2d9", background: showUploadPanel ? "rgba(4,120,87,0.06)" : "#fff", color: showUploadPanel ? "#047857" : "#4a4540", fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", cursor: "pointer", transition: "all 0.15s" }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17,8 12,3 7,8" /><line x1="12" y1="3" x2="12" y2="15" />
@@ -1015,16 +1018,14 @@ export default function ProjectEditorPage() {
         />
 
         <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
-          <EditorToolbar
-            wordCount={wordCount}
-            isSaved={isSaved}
-            onFormat={handleFormat}
-            onUndo={handleUndo}
-            onRedo={handleRedo}
+          <AIActionBar
+            onAction={handleAIAction}
+            loading={aiLoading}
+            hasSelection={hasSelection}
           />
 
           {showUploadPanel && (
-            <div style={{ padding: "1rem 2rem", borderBottom: "1px solid #e8e2d9", background: "#fdf9f6", animation: "fadeUp 0.2s ease both" }}>
+            <div style={{ padding: "1rem 2rem", borderBottom: "1px solid #e8e2d9", background: "#fef6ee", animation: "fadeUp 0.2s ease both" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
                 <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1rem", color: "#1a1510" }}>Upload Files</h3>
                 <p style={{ fontSize: "0.75rem", color: "#9e9589" }}>Extracted text will be inserted into your document</p>
@@ -1033,79 +1034,87 @@ export default function ProjectEditorPage() {
             </div>
           )}
 
-          <div style={{ flex: 1, overflowY: "auto", padding: "2rem 3rem" }}>
-            <input
-              value={docTitle}
-              onChange={e => setDocTitle(e.target.value)}
-              placeholder="Untitled"
-              style={{ width: "100%", border: "none", outline: "none", background: "transparent", fontFamily: "'DM Serif Display', serif", fontSize: "2rem", letterSpacing: "-0.03em", color: "#1a1510", marginBottom: "0.5rem", caretColor: "#c96a3b" }}
-            />
+          <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem 2rem" }}>
+            <div style={{
+              background: "#fff", borderRadius: "16px",
+              boxShadow: "0 2px 16px rgba(0,0,0,0.05), 0 1px 4px rgba(0,0,0,0.03)",
+              padding: "2rem 2.5rem", minHeight: "calc(100% - 1rem)",
+            }}>
+              <input
+                value={docTitle}
+                onChange={e => setDocTitle(e.target.value)}
+                placeholder="Untitled"
+                style={{ width: "100%", border: "none", outline: "none", background: "transparent", fontFamily: "'DM Serif Display', serif", fontSize: "2rem", letterSpacing: "-0.03em", color: "#1a1510", marginBottom: "0.5rem", caretColor: "#047857" }}
+              />
 
-            {aiResult?.suggestions && aiResult.suggestions.length > 0 && (
-              <div style={{ padding: "1rem 1.25rem", borderRadius: "12px", background: "#fffbf0", border: "1px solid #f5e6a3", marginBottom: "1.5rem", animation: "fadeUp 0.3s ease both" }}>
-                <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "#9e6800", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
-                  💡 Brainstorm Ideas
-                </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                  {aiResult.suggestions.map((s, i) => (
-                    <div
-                      key={i}
-                      onClick={() => {
-                        if (editorRef.current && project) {
-                          const wordsBefore = editorRef.current.innerText.trim().split(/\s+/).filter(Boolean).length;
-                          editorRef.current.innerHTML += `<p>${s}</p>`;
-                          const wordsAfter = editorRef.current.innerText.trim().split(/\s+/).filter(Boolean).length;
-                          triggerSave();
-                          recordCommit({
-                            projectId: project.id,
-                            projectTitle: project.title,
-                            projectEmoji: project.emoji || "📖",
-                            type: "brainstorm",
-                            message: `Inserted brainstorm idea`,
-                            wordsBefore,
-                            wordsAfter,
-                            snippet: s.slice(0, 120),
-                          });
-                          lastCommittedWords.current = wordsAfter;
-                        }
-                      }}
-                      style={{ padding: "0.55rem 0.75rem", borderRadius: "8px", background: "#fff", border: "1px solid #f0e6a0", fontSize: "0.83rem", color: "#1a1510", cursor: "pointer", transition: "all 0.15s", lineHeight: 1.5 }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#c96a3b"; e.currentTarget.style.background = "#fffaf0"; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = "#f0e6a0"; e.currentTarget.style.background = "#fff"; }}
-                    >
-                      {s}
-                      <span style={{ fontSize: "0.7rem", color: "#c96a3b", marginLeft: "0.5rem" }}>↗ Insert</span>
-                    </div>
-                  ))}
+              {aiResult?.suggestions && aiResult.suggestions.length > 0 && (
+                <div style={{ padding: "1rem 1.25rem", borderRadius: "12px", background: "#fffbf0", border: "1px solid #f5e6a3", marginBottom: "1.5rem", animation: "fadeUp 0.3s ease both" }}>
+                  <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "#9e6800", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
+                    💡 Brainstorm Ideas
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    {aiResult.suggestions.map((s, i) => (
+                      <div
+                        key={i}
+                        onClick={() => {
+                          if (editorRef.current && project) {
+                            const wordsBefore = editorRef.current.innerText.trim().split(/\s+/).filter(Boolean).length;
+                            editorRef.current.innerHTML += `<p>${s}</p>`;
+                            const wordsAfter = editorRef.current.innerText.trim().split(/\s+/).filter(Boolean).length;
+                            triggerSave();
+                            recordCommit({
+                              projectId: project.id,
+                              projectTitle: project.title,
+                              projectEmoji: project.emoji || "📖",
+                              type: "brainstorm",
+                              message: `Inserted brainstorm idea`,
+                              wordsBefore,
+                              wordsAfter,
+                              snippet: s.slice(0, 120),
+                            });
+                            lastCommittedWords.current = wordsAfter;
+                          }
+                        }}
+                        style={{ padding: "0.55rem 0.75rem", borderRadius: "8px", background: "#fff", border: "1px solid #f0e6a0", fontSize: "0.83rem", color: "#1a1510", cursor: "pointer", transition: "all 0.15s", lineHeight: 1.5 }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#047857"; e.currentTarget.style.background = "#fffaf0"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "#f0e6a0"; e.currentTarget.style.background = "#fff"; }}
+                      >
+                        {s}
+                        <span style={{ fontSize: "0.7rem", color: "#047857", marginLeft: "0.5rem" }}>↗ Insert</span>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => setAiResult(null)} style={{ marginTop: "0.5rem", background: "none", border: "none", fontSize: "0.72rem", color: "#9e9589", cursor: "pointer" }}>
+                    Dismiss
+                  </button>
                 </div>
-                <button onClick={() => setAiResult(null)} style={{ marginTop: "0.5rem", background: "none", border: "none", fontSize: "0.72rem", color: "#9e9589", cursor: "pointer" }}>
-                  Dismiss
-                </button>
-              </div>
-            )}
+              )}
 
-            {aiLoading && (
-              <div style={{ padding: "1rem 1.25rem", borderRadius: "12px", background: "#fdf9f6", border: "1px solid #e8e2d9", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "0.75rem", animation: "pulse 1.5s ease infinite" }}>
-                <div style={{ width: "16px", height: "16px", borderRadius: "50%", border: "2.5px solid #e8e2d9", borderTopColor: "#c96a3b", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
-                <span style={{ fontSize: "0.83rem", color: "#9e9589" }}>AI is thinking…</span>
-              </div>
-            )}
+              {aiLoading && (
+                <div style={{ padding: "1rem 1.25rem", borderRadius: "12px", background: "#fef6ee", border: "1px solid #e8e2d9", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "0.75rem", animation: "pulse 1.5s ease infinite" }}>
+                  <div style={{ width: "16px", height: "16px", borderRadius: "50%", border: "2.5px solid #e8e2d9", borderTopColor: "#047857", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
+                  <span style={{ fontSize: "0.83rem", color: "#9e9589" }}>AI is thinking…</span>
+                </div>
+              )}
 
-            <div
-              ref={editorRef}
-              contentEditable
-              suppressContentEditableWarning
-              className="editor-content"
-              onInput={handleEditorInput}
-              onKeyDown={handleKeyDown}
-              style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.1rem", lineHeight: 1.85, color: "#1a1510", caretColor: "#c96a3b", minHeight: "60vh", outline: "none" }}
-            />
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                className="editor-content"
+                onInput={handleEditorInput}
+                onKeyDown={handleKeyDown}
+                style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.1rem", lineHeight: 1.85, color: "#1a1510", caretColor: "#047857", minHeight: "60vh", outline: "none" }}
+              />
+            </div>
           </div>
 
-          <AIActionBar
-            onAction={handleAIAction}
-            loading={aiLoading}
-            hasSelection={hasSelection}
+          <EditorToolbar
+            wordCount={wordCount}
+            isSaved={isSaved}
+            onFormat={handleFormat}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
           />
         </main>
 

@@ -43,7 +43,7 @@ function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearRes
   return (
     <aside style={{
       width: "320px", flexShrink: 0,
-      background: "#faf7f4", borderLeft: "1px solid #e8e2d9",
+      background: "#fef6ee", borderLeft: "1px solid #e8e2d9",
       display: "flex", flexDirection: "column", overflow: "hidden",
     }}>
       {/* Tab bar */}
@@ -59,7 +59,7 @@ function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearRes
               onClick={() => setActiveTab(tab)}
               style={{
                 padding: "0.35rem 0.85rem", borderRadius: "8px",
-                border: "none", background: activeTab === tab ? "#1a1510" : "transparent",
+                border: "none", background: activeTab === tab ? "#047857" : "transparent",
                 color: activeTab === tab ? "#fff" : "#9e9589",
                 fontFamily: "'DM Sans', sans-serif", fontSize: "0.82rem", fontWeight: 500,
                 cursor: "pointer", textTransform: "capitalize", transition: "all 0.15s",
@@ -88,7 +88,7 @@ function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearRes
           animation: "fadeUp 0.3s ease both",
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
-            <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#c96a3b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#047857", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               AI Result
             </span>
             <button onClick={onClearResult} style={{ ...tabIconBtn, color: "#9e9589" }}>✕</button>
@@ -144,11 +144,12 @@ function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearRes
               }}>
                 <div style={{
                   maxWidth: "85%",
-                  padding: "0.6rem 0.85rem",
-                  borderRadius: msg.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
-                  background: msg.role === "user" ? "#1a1510" : "#fff",
+                  padding: "0.7rem 1rem",
+                  borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                  background: msg.role === "user" ? "#047857" : "#fff",
                   color: msg.role === "user" ? "#fff" : "#1a1510",
                   border: msg.role === "assistant" ? "1px solid #e8e2d9" : "none",
+                  boxShadow: msg.role === "user" ? "0 3px 12px rgba(4,120,87,0.25)" : "0 1px 4px rgba(0,0,0,0.04)",
                   fontSize: "0.82rem", lineHeight: 1.6,
                   fontFamily: "'DM Sans', sans-serif",
                 }}>
@@ -166,8 +167,9 @@ function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearRes
                   <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
                     {[0, 1, 2].map(i => (
                       <span key={i} style={{
-                        width: "6px", height: "6px", borderRadius: "50%", background: "#c96a3b",
-                        animation: `bounce 1s ease ${i * 0.15}s infinite`,
+                        width: "7px", height: "7px", borderRadius: "50%", background: "#047857",
+                        animation: `typingWave 1.4s ease-in-out ${i * 0.2}s infinite`,
+                        opacity: 0.6,
                       }} />
                     ))}
                   </div>
@@ -215,7 +217,7 @@ function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearRes
                   disabled={!input.trim() || loading}
                   style={{
                     width: "28px", height: "28px", borderRadius: "8px",
-                    border: "none", background: input.trim() ? "#c96a3b" : "#e8e2d9",
+                    border: "none", background: input.trim() ? "#047857" : "#e8e2d9",
                     color: "#fff", cursor: input.trim() ? "pointer" : "default",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     transition: "background 0.2s",
@@ -241,9 +243,9 @@ function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearRes
       )}
 
       <style>{`
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-4px); }
+        @keyframes typingWave {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30% { transform: translateY(-6px); opacity: 1; }
         }
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(8px); }

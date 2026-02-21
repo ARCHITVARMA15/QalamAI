@@ -9,7 +9,7 @@ interface Props {
 }
 
 const TONES = ["Dramatic", "Casual", "Formal", "Poetic", "Terse", "Whimsical"];
- function AIActionBar({ onAction, loading, hasSelection }: Props) {
+function AIActionBar({ onAction, loading, hasSelection }: Props) {
   const [showToneMenu, setShowToneMenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
@@ -31,8 +31,12 @@ const TONES = ["Dramatic", "Casual", "Formal", "Poetic", "Terse", "Whimsical"];
     <div style={{
       display: "flex", alignItems: "center", gap: "0.5rem",
       padding: "0.6rem 1rem",
-      background: "rgba(250,247,244,0.95)", backdropFilter: "blur(8px)",
-      borderTop: "1px solid #e8e2d9",
+      margin: "0.75rem 1rem 0",
+      background: "rgba(255,255,255,0.55)", backdropFilter: "blur(16px)",
+      WebkitBackdropFilter: "blur(16px)",
+      border: "1px solid rgba(232,226,217,0.6)",
+      borderRadius: "14px",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)",
       flexWrap: "wrap",
     }}>
       {primaryActions.map(action => (
@@ -62,7 +66,7 @@ const TONES = ["Dramatic", "Casual", "Formal", "Poetic", "Terse", "Whimsical"];
         />
         {showToneMenu && (
           <div style={{
-            position: "absolute", bottom: "calc(100% + 8px)", left: 0,
+            position: "absolute", top: "calc(100% + 8px)", left: 0,
             background: "#fff", border: "1px solid #e8e2d9",
             borderRadius: "12px", padding: "0.4rem",
             boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 20,
@@ -105,7 +109,7 @@ const TONES = ["Dramatic", "Casual", "Formal", "Poetic", "Terse", "Whimsical"];
         />
         {showMoreMenu && (
           <div style={{
-            position: "absolute", bottom: "calc(100% + 8px)", left: 0,
+            position: "absolute", top: "calc(100% + 8px)", left: 0,
             background: "#fff", border: "1px solid #e8e2d9",
             borderRadius: "12px", padding: "0.4rem",
             boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 20,
@@ -168,9 +172,9 @@ function ActionButton({
         style={{
           display: "flex", alignItems: "center", gap: "0.4rem",
           padding: "0.45rem 0.9rem", borderRadius: "8px",
-          border: active ? "1.5px solid #c96a3b" : "1.5px solid #e8e2d9",
-          background: active ? "rgba(201,106,59,0.06)" : hovered && !disabled ? "#f5f1eb" : "#fff",
-          color: disabled ? "#b8b0a4" : active ? "#c96a3b" : "#1a1510",
+          border: active ? "1.5px solid #047857" : "1.5px solid #e8e2d9",
+          background: active ? "rgba(4,120,87,0.06)" : hovered && !disabled ? "#f5f1eb" : "#fff",
+          color: disabled ? "#b8b0a4" : active ? "#047857" : "#1a1510",
           fontFamily: "'DM Sans', sans-serif", fontSize: "0.82rem", fontWeight: 500,
           cursor: disabled ? "not-allowed" : "pointer",
           transition: "all 0.15s", opacity: loading ? 0.7 : 1,
@@ -181,13 +185,13 @@ function ActionButton({
         {label}
         {label === "Tone" || label === "More Tools" ? (
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <polyline points={active ? "18,15 12,9 6,15" : "6,9 12,15 18,9"}/>
+            <polyline points={active ? "18,15 12,9 6,15" : "6,9 12,15 18,9"} />
           </svg>
         ) : null}
       </button>
       {tooltip && hovered && (
         <div style={{
-          position: "absolute", bottom: "calc(100% + 6px)", left: "50%",
+          position: "absolute", top: "calc(100% + 6px)", left: "50%",
           transform: "translateX(-50%)",
           background: "#1a1510", color: "#fff",
           padding: "0.25rem 0.6rem", borderRadius: "6px",
