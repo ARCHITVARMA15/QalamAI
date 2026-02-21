@@ -25,10 +25,16 @@ app = FastAPI(
 # Allow frontend React app to communicate with our backend
 origins = [
     "http://localhost:5173",  # Vite default
+<<<<<<< Updated upstream
     "http://localhost:3002",
     "http://localhost:3000"
     "http://localhost:3001"
         # React default
+=======
+    "http://localhost:3000",
+    
+      # React default
+>>>>>>> Stashed changes
 ]
 
 app.add_middleware(
