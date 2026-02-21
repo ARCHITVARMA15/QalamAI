@@ -9,6 +9,7 @@ from services.contradiction_detector import ContradictionDetector
 from services.persona_generator import PersonaGenerator
 from services.style_transformer import StyleTransformer
 from services.enhancement_service import EnhancementService
+from ai.groq_service import generate_chat_reply
 
 router = APIRouter()
 
@@ -32,6 +33,12 @@ class AIActionRequest(BaseModel):
     content: str
     tone: str = "formal"
 
+class ChatRequest(BaseModel):
+    messages: list
+    projectId: str
+    scriptId: str = ""
+    context: str = ""
+
 @router.post("/scripts/{script_id}/analyze")
 async def analyze_script(script_id: str, request: AnalyzeRequest):
 
@@ -47,15 +54,42 @@ async def analyze_script(script_id: str, request: AnalyzeRequest):
     flags = detector.check_sentence(request.text, existing_nodes=existing_nodes, existing_links=existing_links)
 
     # 3. Knowledge Graph Update
-    # Process the ENTIRE text to extract entities and relationships (Stateless)
+    # Process the ENTIRE new text to extract entities and relationships (Stateless)
     graph_data = kg_engine.process_text(request.text, scene_id="current_scene")
 
-    # 4. Save the Story Bible to MongoDB (Upsert logic to create or update)
-    # We store the nodes (characters/locations) and links (relationships)
+    # 4. Merge the new graph data with the existing graph
+    # Create dicts for faster lookup
+    existing_nodes_dict = {n["id"]: n for n in existing_nodes}
+    
+    # Merge Nodes
+    for new_node in graph_data.get("nodes", []):
+        node_id = new_node["id"]
+        if node_id in existing_nodes_dict:
+            # Merge mentions if the node exists
+            existing_mentions = set(existing_nodes_dict[node_id].get("mentions", []))
+            new_mentions = set(new_node.get("mentions", []))
+            existing_nodes_dict[node_id]["mentions"] = list(existing_mentions.union(new_mentions))
+        else:
+            existing_nodes_dict[node_id] = new_node
+            
+    merged_nodes = list(existing_nodes_dict.values())
+    
+    # Merge Links
+    # To prevent duplicates, we uniquely identify a link by (source, target, relation)
+    merged_links = list(existing_links)
+    existing_links_set = {(link["source"], link["target"], link.get("relation", "")) for link in existing_links}
+    
+    for new_link in graph_data.get("links", []):
+        link_signature = (new_link["source"], new_link["target"], new_link.get("relation", ""))
+        if link_signature not in existing_links_set:
+            merged_links.append(new_link)
+            existing_links_set.add(link_signature)
+
+    # 5. Save the merged Story Bible to MongoDB
     bible_data = {
         "script_id": script_id,
-        "nodes": graph_data.get("nodes", []),
-        "links": graph_data.get("links", [])
+        "nodes": merged_nodes,
+        "links": merged_links
     }
     
     await db["story_bibles"].update_one(
@@ -158,4 +192,42 @@ async def transform_style(request: AIActionRequest):
                 "description": tag["detail"]
             } for tag in result["reason_tags"]
         ]
+    }
+
+@router.post("/chat")
+async def chat_interaction(request: ChatRequest):
+    """
+    Endpoint for conversing with the Groq-powered AI writing assistant.
+    """
+    db = get_database()
+    
+    story_bible_summary = ""
+    if request.scriptId:
+        bible = await db["story_bibles"].find_one({"script_id": request.scriptId})
+        if bible:
+            nodes = bible.get("nodes", [])
+            links = bible.get("links", [])
+            
+            # Format nodes
+            node_summaries = []
+            for n in nodes:
+                # E.g., Character: Arjun (mentions: scene_1)
+                mentions = ", ".join(n.get("mentions", []))
+                node_summaries.append(f"- {n.get('type', 'Entity')}: {n['id']} (Scenes: {mentions})")
+                
+            # Format links
+            link_summaries = []
+            for link in links:
+                rel = link.get("relation", "interacted with")
+                link_summaries.append(f"- {link['source']} [{rel}] {link['target']}")
+                
+            story_bible_summary = "STORY BIBLE CONTEXT:\n"
+            if node_summaries:
+                story_bible_summary += "Entities/Characters:\n" + "\n".join(node_summaries) + "\n\n"
+            if link_summaries:
+                story_bible_summary += "Relationships/Events:\n" + "\n".join(link_summaries) + "\n"
+                
+    reply = await generate_chat_reply(request.messages, request.context, story_bible_summary)
+    return {
+        "reply": reply
     }

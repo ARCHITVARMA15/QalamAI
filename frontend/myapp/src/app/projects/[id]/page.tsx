@@ -525,6 +525,7 @@ export default function ProjectEditorPage() {
         {/* RIGHT SIDEBAR: AI Chat */}
         <RightSidebar
           projectId={projectId}
+          scriptId={activeScriptId}
           editorContent={editorRef.current?.innerText || ""}
           aiResult={aiResult && !aiResult.suggestions ? aiResult : null}
           onClearResult={() => setAiResult(null)}

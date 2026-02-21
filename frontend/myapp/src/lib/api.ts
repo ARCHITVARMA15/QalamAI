@@ -152,31 +152,20 @@ export async function uploadFile(file: File, projectId: string): Promise<UploadR
 export async function sendChatMessage(
   messages: ChatMessage[],
   projectId: string,
+  scriptId: string,
   context: string
 ): Promise<ChatMessage> {
-  // TODO: Replace with real API call
-  // const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat`, {
-  //   method: "POST",
-  //   headers: { "Content-Type": "application/json" },
-  //   body: JSON.stringify({ messages, projectId, context }),
-  // });
-  // if (!res.ok) throw new Error(await res.text());
-  // const data = await res.json();
-  // return { role: "assistant", content: data.reply, timestamp: Date.now() };
-
-  await mockDelay(1000);
-  const lastMsg = messages[messages.length - 1]?.content || "";
-  const replies = [
-    "Great question! Based on the narrative arc you're developing, I'd suggest introducing this conflict at the end of Act 1 to maximize tension going into the midpoint.",
-    "Your protagonist's motivation could be strengthened here. What does she stand to lose if she fails — beyond the obvious? The emotional stakes often carry more weight than plot stakes.",
-    "Consider using a metaphor that threads through the entire story. Something small in chapter one that transforms in meaning by the finale.",
-    "The pacing in this section feels slightly rushed. What if you added a quiet moment of reflection before the confrontation? It'll make the impact land harder.",
-  ];
-  return {
-    role: "assistant",
-    content: replies[Math.floor(Math.random() * replies.length)],
-    timestamp: Date.now(),
-  };
+  const res = await fetch(`http://localhost:8000/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, projectId, scriptId, context }),
+  });
+  
+  if (!res.ok) throw new Error(await res.text());
+  
+  const data = await res.json();
+  
+  return { role: "assistant", content: data.reply, timestamp: Date.now() };
 }
 
 /**

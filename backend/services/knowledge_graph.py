@@ -21,8 +21,8 @@ class KnowledgeGraphEngine:
         doc = self.nlp(text)
         
         # 1. Extract Entities (Nodes)
-        # We focus on characters (PERSON), locations (GPE, LOC, FAC), and organizations (ORG)
-        valid_entity_labels = {"PERSON", "GPE", "LOC", "FAC", "ORG"}
+        # We focus on characters (PERSON), locations (GPE, LOC, FAC), organizations (ORG), dates (DATE), and events (EVENT)
+        valid_entity_labels = {"PERSON", "GPE", "LOC", "FAC", "ORG", "DATE", "EVENT"}
         entities = {} # Mapping of text to its label for the current doc
         
         for ent in doc.ents:
@@ -39,26 +39,42 @@ class KnowledgeGraphEngine:
                 if scene_id not in graph.nodes[ent_text]["mentions"]:
                     graph.nodes[ent_text]["mentions"].append(scene_id)
                 
-        # 2. Extract Basic Relationships (Edges)
-        # We use standard subject-verb-object extraction from dependency parsing as a heuristic
+        # 2. Extract Relationships (Edges) & Attributes
         for sent in doc.sents:
-            subjects = [tok for tok in sent if ("subj" in tok.dep_)]
-            objects = [tok for tok in sent if ("obj" in tok.dep_)]
-            verbs = [tok for tok in sent if tok.pos_ == "VERB"]
+            # Reconstruct attributes (e.g., Arjun has blue eyes -> Arjun -(has)-> eyes(blue))
+            # Find all verbs in the sentence
+            verbs = [tok for tok in sent if tok.pos_ == "VERB" or tok.lemma_ == "have" or tok.lemma_ == "be"]
             
-            if subjects and objects and verbs:
-                # Use the first subject, object, and verb found in the sentence
-                subj = subjects[0].text
-                obj = objects[0].text
-                verb = verbs[0].lemma_
+            for action in verbs:
+                # Find direct subjects and objects of THIS SPECIFIC verb
+                subjects = [tok for tok in action.children if "subj" in tok.dep_]
+                objects = [tok for tok in action.children if "obj" in tok.dep_ or tok.dep_ == "attr" or tok.dep_ == "acomp"]
                 
-                # Check if the extracted subject and object match our known entities
-                subj_ent = self._find_matching_entity(subj, entities)
-                obj_ent = self._find_matching_entity(obj, entities)
-                
-                if subj_ent and obj_ent and subj_ent != obj_ent:
-                    # Add a directed edge representing the relationship
-                    graph.add_edge(subj_ent, obj_ent, relation=verb, scene_id=scene_id, sentence=sent.text.strip())
+                # If there are conjunctions, also grab them (e.g. Arjun and Karan ran)
+                for subj in list(subjects):
+                    subjects.extend([t for t in subj.conjuncts])
+                for obj in list(objects):
+                    objects.extend([t for t in obj.conjuncts])
+
+                if subjects and objects:
+                    for subj in subjects:
+                        for obj in objects:
+                            subj_text = subj.text
+                            
+                            # Build a compound object text if adjectives are attached (e.g., "blue eyes")
+                            obj_mods = [t.text for t in obj.children if t.pos_ == "ADJ"]
+                            obj_text = f"{' '.join(obj_mods)} {obj.text}".strip() if obj_mods else obj.text
+
+                            subj_ent = self._find_matching_entity(subj_text, entities)
+                            # If the object isn't a named entity, we can still add it as a trait/item node
+                            obj_ent = self._find_matching_entity(obj_text, entities) or obj_text
+                            
+                            if subj_ent and obj_ent and subj_ent != obj_ent:
+                                # Add the object as an attribute/item node if it wasn't a formal entity
+                                if not graph.has_node(obj_ent):
+                                    graph.add_node(obj_ent, type="ATTRIBUTE", mentions=[scene_id])
+                                
+                                graph.add_edge(subj_ent, obj_ent, relation=action.lemma_, scene_id=scene_id, sentence=sent.text.strip())
         
         return nx.node_link_data(graph)
                     

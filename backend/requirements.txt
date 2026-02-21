@@ -45,3 +45,6 @@ networkx
 pymupdf
 python-docx
 python-multipart 
+
+#AI 
+groq

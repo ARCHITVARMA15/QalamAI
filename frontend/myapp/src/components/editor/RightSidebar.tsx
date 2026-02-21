@@ -5,12 +5,13 @@ import { sendChatMessage, ChatMessage } from "@/lib/api";
 
 interface Props {
   projectId: string;
+  scriptId: string | null;
   editorContent: string;
   aiResult: { text: string; changes?: { type: string; description: string }[] } | null;
   onClearResult: () => void;
 }
 
- function RightSidebar({ projectId, editorContent, aiResult, onClearResult }: Props) {
+function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearResult }: Props) {
   const [activeTab, setActiveTab] = useState<"chat" | "history">("chat");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -30,7 +31,7 @@ interface Props {
     setInput("");
     setLoading(true);
     try {
-      const reply = await sendChatMessage(updated, projectId, editorContent);
+      const reply = await sendChatMessage(updated, projectId, scriptId || "", editorContent);
       setMessages([...updated, reply]);
     } catch {
       setMessages([...updated, { role: "assistant", content: "Sorry, something went wrong. Please try again.", timestamp: Date.now() }]);
@@ -71,7 +72,7 @@ interface Props {
         <div style={{ display: "flex", gap: "0.25rem" }}>
           <button style={tabIconBtn} title="New chat" onClick={() => setMessages([])}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           </button>
         </div>
@@ -221,7 +222,7 @@ interface Props {
                   }}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/>
+                    <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22,2 15,22 11,13 2,9" />
                   </svg>
                 </button>
               </div>
