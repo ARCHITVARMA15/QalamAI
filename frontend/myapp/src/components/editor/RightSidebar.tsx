@@ -9,9 +9,13 @@ interface Props {
   editorContent: string;
   aiResult: { text: string; changes?: { type: string; description: string }[] } | null;
   onClearResult: () => void;
+  // Comic image generation result
+  comicImage: { image_base64: string; prompt_used: string; source_text: string } | null;
+  comicLoading: boolean;
+  onClearComic: () => void;
 }
 
-function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearResult }: Props) {
+function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearResult, comicImage, comicLoading, onClearComic }: Props) {
   const [activeTab, setActiveTab] = useState<"chat" | "history">("chat");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -31,7 +35,7 @@ function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearRes
     setInput("");
     setLoading(true);
     try {
-      const reply = await sendChatMessage(updated, projectId, scriptId || "", editorContent);
+      const reply = await sendChatMessage(updated, projectId, scriptId || "", editorContent, model);
       setMessages([...updated, reply]);
     } catch {
       setMessages([...updated, { role: "assistant", content: "Sorry, something went wrong. Please try again.", timestamp: Date.now() }]);
@@ -77,6 +81,56 @@ function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearRes
           </button>
         </div>
       </div>
+
+      {/* Comic Image Panel — shows generated comic art */}
+      {comicLoading && (
+        <div style={{
+          margin: "0.75rem", padding: "1.25rem",
+          background: "#fff", borderRadius: "12px",
+          border: "1px solid #e8e2d9",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+          animation: "pulse 1.5s ease infinite",
+          textAlign: "center",
+        }}>
+          <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🖼️</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
+            <div style={{ width: "14px", height: "14px", borderRadius: "50%", border: "2.5px solid #e8e2d9", borderTopColor: "#047857", animation: "spin 0.8s linear infinite" }} />
+            <span style={{ fontSize: "0.82rem", color: "#9e9589" }}>Generating comic panel…</span>
+          </div>
+          <p style={{ fontSize: "0.72rem", color: "#b8b0a4", marginTop: "0.4rem" }}>This may take 5–15 seconds</p>
+        </div>
+      )}
+
+      {comicImage && (
+        <div style={{
+          margin: "0.75rem", padding: "0.75rem",
+          background: "#fff", borderRadius: "12px",
+          border: "1px solid #e8e2d9",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+          animation: "fadeUp 0.3s ease both",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+            <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#047857", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              🖼️ Comic Panel
+            </span>
+            <button onClick={onClearComic} style={{ ...tabIconBtn, color: "#9e9589" }}>✕</button>
+          </div>
+          {/* The generated comic image */}
+          <img
+            src={`data:image/png;base64,${comicImage.image_base64}`}
+            alt="Generated comic panel"
+            style={{
+              width: "100%", borderRadius: "8px",
+              border: "1px solid #f0ebe3",
+              marginBottom: "0.5rem",
+            }}
+          />
+          {/* Source text preview */}
+          <p style={{ fontSize: "0.72rem", color: "#9e9589", lineHeight: 1.5, fontStyle: "italic" }}>
+            "{comicImage.source_text.length > 100 ? comicImage.source_text.slice(0, 100) + "…" : comicImage.source_text}"
+          </p>
+        </div>
+      )}
 
       {/* AI Result Panel */}
       {aiResult && (
@@ -211,6 +265,7 @@ function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearRes
                 >
                   <option>Standard</option>
                   <option>Advanced</option>
+                  <option>Fact Check</option>
                 </select>
                 <button
                   onClick={send}
@@ -251,6 +306,8 @@ function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearRes
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
       `}</style>
     </aside>
   );

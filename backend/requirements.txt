@@ -48,3 +48,4 @@ python-multipart
 
 #AI 
 groq
+google-genai

@@ -7,9 +7,11 @@ from config.db import get_database
 from services.knowledge_graph import KnowledgeGraphEngine
 from services.contradiction_detector import ContradictionDetector
 from services.persona_generator import PersonaGenerator
-from services.style_transformer import StyleTransformer
+# from services.style_transformer import StyleTransformer  # Disabled — T5-small crashes on startup
 from services.enhancement_service import EnhancementService
 from ai.groq_service import generate_chat_reply
+from ai.writing_tools import handle_ai_action
+from ai.fact_checker import fact_check_with_rag
 
 router = APIRouter()
 
@@ -18,7 +20,7 @@ try:
     kg_engine = KnowledgeGraphEngine()
     detector = ContradictionDetector()
     persona_gen = PersonaGenerator()
-    style_transformer = StyleTransformer()
+    # style_transformer = StyleTransformer()  # Disabled — T5-small crashes on startup
     enhancement_service = EnhancementService()
 except Exception as e:
     print(f"Error loading NLP engines: {e}")
@@ -32,12 +34,16 @@ class PersonaRequest(BaseModel):
 class AIActionRequest(BaseModel):
     content: str
     tone: str = "formal"
+    action: str = ""
+    context: str = ""
+    genre: str = ""
 
 class ChatRequest(BaseModel):
     messages: list
     projectId: str
     scriptId: str = ""
     context: str = ""
+    mode: str = "Standard"
 
 @router.post("/scripts/{script_id}/analyze")
 async def analyze_script(script_id: str, request: AnalyzeRequest):
@@ -178,22 +184,28 @@ async def enhance_content(request: AIActionRequest):
         ]
     }
 
+# Tone transformation — routed through Groq (T5-small is disabled)
 @router.post("/transform-style")
 async def transform_style(request: AIActionRequest):
+    result = await handle_ai_action("tone", request.content, tone=request.tone)
+    return result
+
+
+# ── Unified AI Action endpoint — handles write, rewrite, describe, etc. ──────
+@router.post("/ai/action")
+async def ai_action_endpoint(request: AIActionRequest):
     """
-    Endpoint for style and tone transformation using T5 and rules.
+    Central endpoint for all AI writing actions.
+    Dispatches to the Groq-powered handler based on request.action.
     """
-    result = style_transformer.transform_style(request.content, request.tone)
-    
-    return {
-        "result": result["modified"],
-        "changes": [
-            {
-                "type": tag["type"],
-                "description": tag["detail"]
-            } for tag in result["reason_tags"]
-        ]
-    }
+    result = await handle_ai_action(
+        action=request.action,
+        content=request.content,
+        context=request.context,
+        tone=request.tone,
+        genre=request.genre,
+    )
+    return result
 
 @router.post("/chat")
 async def chat_interaction(request: ChatRequest):
@@ -209,18 +221,28 @@ async def chat_interaction(request: ChatRequest):
             nodes = bible.get("nodes", [])
             links = bible.get("links", [])
             
-            # Format nodes
+            # Format nodes (capped to avoid token limit errors)
+            MAX_NODES = 50
+            MAX_LINKS = 100
+            
             node_summaries = []
-            for n in nodes:
-                # E.g., Character: Arjun (mentions: scene_1)
-                mentions = ", ".join(n.get("mentions", []))
-                node_summaries.append(f"- {n.get('type', 'Entity')}: {n['id']} (Scenes: {mentions})")
+            for n in nodes[:MAX_NODES]:
+                mentions = n.get("mentions", [])
+                mentions_preview = mentions[:5]
+                if len(mentions) > 5:
+                    mentions_preview.append("...")
+                m_str = ", ".join(mentions_preview)
+                node_summaries.append(f"- {n.get('type', 'Entity')}: {n['id']} (Scenes: {m_str})")
+            if len(nodes) > MAX_NODES:
+                node_summaries.append(f"... (and {len(nodes) - MAX_NODES} more entities)")
                 
-            # Format links
+            # Format links (capped to avoid token limit errors)
             link_summaries = []
-            for link in links:
+            for link in links[:MAX_LINKS]:
                 rel = link.get("relation", "interacted with")
                 link_summaries.append(f"- {link['source']} [{rel}] {link['target']}")
+            if len(links) > MAX_LINKS:
+                link_summaries.append(f"... (and {len(links) - MAX_LINKS} more relationships)")
                 
             story_bible_summary = "STORY BIBLE CONTEXT:\n"
             if node_summaries:
@@ -228,7 +250,47 @@ async def chat_interaction(request: ChatRequest):
             if link_summaries:
                 story_bible_summary += "Relationships/Events:\n" + "\n".join(link_summaries) + "\n"
                 
-    reply = await generate_chat_reply(request.messages, request.context, story_bible_summary)
+    # Fact Check mode — use RAG pipeline with knowledge graph retrieval
+    if request.mode == "Fact Check":
+        # Extract the last user message for fact checking
+        last_user_msg = ""
+        for msg in reversed(request.messages):
+            if msg.get("role") == "user":
+                last_user_msg = msg.get("content", "")
+                break
+
+        # Also run the rule-based contradiction detector
+        programmatic_flags = []
+        if request.scriptId:
+            bible = await db["story_bibles"].find_one({"script_id": request.scriptId})
+            if bible:
+                nodes = bible.get("nodes", [])
+                links = bible.get("links", [])
+                flags = detector.check_sentence(last_user_msg, existing_nodes=nodes, existing_links=links)
+                
+                # Save any contradictions found to DB for the UI panel
+                for flag in flags:
+                    new_contra = {
+                        "script_id": request.scriptId,
+                        "sentence": flag.get("conflicting_sentence"),
+                        "conflict_with": flag.get("reason_detail"),
+                        "reason_tag": flag.get("reason_tag"),
+                        "resolved": False
+                    }
+                    await insert_document("contradictions", new_contra)
+                    programmatic_flags.append(flag)
+
+        reply = await fact_check_with_rag(
+            user_message=last_user_msg,
+            script_id=request.scriptId,
+            editor_content=request.context,
+            conversation_history=request.messages,
+            programmatic_flags=programmatic_flags,
+        )
+        return {"reply": reply}
+
+    # Standard / Advanced modes — use the regular chat reply
+    reply = await generate_chat_reply(request.messages, request.context, story_bible_summary, request.mode)
     return {
         "reply": reply
     }

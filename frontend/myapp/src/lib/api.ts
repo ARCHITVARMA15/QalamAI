@@ -7,7 +7,7 @@
  */
 
 export interface AIRequest {
-  action: "write" | "rewrite" | "describe" | "brainstorm" | "chat" | "enhance" | "tone";
+  action: "write" | "rewrite" | "describe" | "brainstorm" | "chat" | "enhance" | "tone" | "shorten" | "expand" | "summarize";
   content: string;
   projectId: string;
   context?: string;       // surrounding text for consistency
@@ -44,8 +44,7 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-// ─── Mock delay helper ───────────────────────────────────────────────────────
-const mockDelay = (ms = 1200) => new Promise((res) => setTimeout(res, ms));
+
 
 // ─── AI Actions ──────────────────────────────────────────────────────────────
 
@@ -74,42 +73,20 @@ export async function callAIAction(req: AIRequest): Promise<AIResponse> {
     return res.json();
   }
 
-  await mockDelay();
-
-  const mocks: Record<string, AIResponse> = {
-    write: {
-      result: `The morning sun cast long shadows across the cobblestones as Elena stepped from the doorway. She pulled her coat tighter, aware of the eyes that followed her — the city always watched those who didn't belong. Three days. That was all she had before the council made their decision, before everything she'd built here crumbled to dust.\n\nShe reached into her pocket and felt the edge of the letter. Still there. Still real.`,
-      changes: [{ type: "structure", description: "Added narrative hook and time pressure to create immediate tension" }],
-    },
-    rewrite: {
-      result: req.content
-        ? `${req.content.split(" ").slice(0, 8).join(" ")} — though perhaps that framing deserves a second look. Consider instead: the scene opens with movement, with urgency, the character already mid-action rather than observed from outside.`
-        : "Please select text to rewrite.",
-      changes: [
-        { type: "clarity", description: "Shifted from passive to active voice" },
-        { type: "flow", description: "Restructured sentence rhythm for better pacing" },
-      ],
-    },
-    describe: {
-      result: `The room smelled of old paper and something sharper — chemical, almost medicinal. Light filtered through shuttered blinds in pale stripes. Every surface held its own archaeology: stacked journals, a cracked leather chair, a mug with a dark ring at its base. The kind of space where time moved differently, or didn't move at all.`,
-      changes: [{ type: "clarity", description: "Used sensory details across smell, sight, and texture to build atmosphere" }],
-    },
-    brainstorm: {
-      result: "",
-      suggestions: [
-        "What if the antagonist genuinely believes they're the hero of this story?",
-        "Introduce a ticking clock: the protagonist has 48 hours before an irreversible event.",
-        "Add a morally ambiguous ally whose loyalty shifts based on their own hidden agenda.",
-        "The setting itself could become a character — a city that remembers, a house that forgets.",
-        "Consider a non-linear timeline where the ending is revealed at the midpoint.",
-      ],
-    },
-    chat: {
-      result: "That's an interesting direction for your story. Based on what you've written so far, I'd suggest developing the secondary characters more — they can act as mirrors for your protagonist's internal conflict. Would you like me to suggest some character dynamics?",
-    },
-  };
-
-  return mocks[req.action] || { result: "Action not recognized." };
+  // All other actions — routed to Groq-powered /api/ai/action endpoint
+  const res = await fetch(`http://localhost:8000/api/ai/action`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: req.action,
+      content: req.content,
+      context: req.context || "",
+      tone: req.tone || "formal",
+      genre: req.genre || "",
+    }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
 
 /**
@@ -153,12 +130,13 @@ export async function sendChatMessage(
   messages: ChatMessage[],
   projectId: string,
   scriptId: string,
-  context: string
+  context: string,
+  mode: string = "Standard"
 ): Promise<ChatMessage> {
   const res = await fetch(`http://localhost:8000/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, projectId, scriptId, context }),
+    body: JSON.stringify({ messages, projectId, scriptId, context, mode }),
   });
   
   if (!res.ok) throw new Error(await res.text());
@@ -182,4 +160,28 @@ export async function saveProject(scriptId: string, content: string, wordCount: 
   if (!res.ok) {
     console.error("Failed to autosave to backend", await res.text());
   }
+}
+
+// ─── Comic Image Generation ─────────────────────────────────────────────────
+
+export interface ComicResult {
+  status: string;
+  image_base64: string;
+  prompt_used: string;
+  source_text: string;
+}
+
+/**
+ * POST /api/scripts/:scriptId/generate-comic
+ * Sends selected text to Imagen 4.0 and returns a comic-style image as base64.
+ */
+export async function generateComicImage(scriptId: string, selectedText: string): Promise<ComicResult> {
+  const res = await fetch(`http://localhost:8000/api/scripts/${scriptId}/generate-comic`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ selected_text: selectedText }),
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }

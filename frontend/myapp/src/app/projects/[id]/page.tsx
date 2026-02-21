@@ -541,7 +541,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { callAIAction, saveProject, UploadResponse } from "@/lib/api";
+import { callAIAction, saveProject, UploadResponse, generateComicImage, ComicResult } from "@/lib/api";
 import { recordCommit, CommitType } from "@/lib/commits";
 import LeftSidebar from "@/components/editor/LeftSidebar";
 import RightSidebar from "@/components/editor/RightSidebar";
@@ -605,6 +605,10 @@ export default function ProjectEditorPage() {
   const [activeScriptId, setActiveScriptId] = useState<string | null>(null);
   const [docTitle, setDocTitle] = useState("Untitled");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Comic generation state
+  const [comicImage, setComicImage] = useState<ComicResult | null>(null);
+  const [comicLoading, setComicLoading] = useState(false);
 
   // ─── Commit tracking refs ────────────────────────────────────────────────────
   const lastCommittedWords = useRef(0);
@@ -780,6 +784,24 @@ export default function ProjectEditorPage() {
     setAiResult(null);
 
     const selection = window.getSelection()?.toString() || "";
+
+    // Handle comic generation separately — it has its own loading state and display
+    if (action === "comic") {
+      setAiLoading(false);
+      if (!selection.trim()) return;
+      setComicLoading(true);
+      setComicImage(null);
+      try {
+        const result = await generateComicImage(activeScriptId || "draft", selection);
+        setComicImage(result);
+      } catch (err) {
+        console.error("Comic generation failed:", err);
+      } finally {
+        setComicLoading(false);
+      }
+      return;
+    }
+
     const fullContent = editorRef.current?.innerText || "";
     const wordsBefore = fullContent.trim().split(/\s+/).filter(Boolean).length;
 
@@ -1124,6 +1146,9 @@ export default function ProjectEditorPage() {
           editorContent={editorRef.current?.innerText || ""}
           aiResult={aiResult && !aiResult.suggestions ? aiResult : null}
           onClearResult={() => setAiResult(null)}
+          comicImage={comicImage}
+          comicLoading={comicLoading}
+          onClearComic={() => setComicImage(null)}
         />
       </div>
     </>

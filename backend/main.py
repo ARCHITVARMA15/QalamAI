@@ -12,7 +12,7 @@ async def lifespan(app: FastAPI):
     # Runs when app stops — closes DB connection cleanly
     await close_db()
 
-from routers import users, scripts, analysis
+from routers import users, scripts, analysis, media
 
 app = FastAPI(
     title="Kalam API",
@@ -46,6 +46,7 @@ async def health_check():
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(scripts.router, prefix="/api", tags=["Projects & Scripts"])
 app.include_router(analysis.router, prefix="/api", tags=["AI Engine"])
+app.include_router(media.router, prefix="/api", tags=["Media Generation"])
 
 # WebSocket for real-time collaboration
 @app.websocket("/ws/collab/{doc_id}")

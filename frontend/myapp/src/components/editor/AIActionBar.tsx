@@ -14,10 +14,10 @@ function AIActionBar({ onAction, loading, hasSelection }: Props) {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   const primaryActions = [
-    { id: "write", label: "Write", icon: "✍️", desc: "Continue writing", requiresSelection: false },
     { id: "rewrite", label: "Rewrite", icon: "🔄", desc: "Rewrite selection", requiresSelection: true },
     { id: "describe", label: "Describe", icon: "🎨", desc: "Add description", requiresSelection: false },
     { id: "brainstorm", label: "Brainstorm", icon: "💡", desc: "Generate ideas", requiresSelection: false },
+    { id: "comic", label: "Comic", icon: "🖼️", desc: "Generate comic from selection", requiresSelection: true },
   ];
 
   const moreActions = [
