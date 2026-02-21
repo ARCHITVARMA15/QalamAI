@@ -106,6 +106,7 @@ An intelligent writing assistant for screenwriters and long-form content creator
 
 - `main.py` — FastAPI routes and application entry point
 - `settings.py` — Environment configuration
+- `data/file_parser.py` — PDF/Word/TXT text extraction, metadata cleaning, story splitting
 - `knowledge_graph.py` — spaCy NER + NetworkX story bible construction
 - `contradiction_detector.py` — Rule-based consistency and logic checker
 - `style_transformer.py` — Vocabulary rules + local T5-small style transfer
@@ -117,6 +118,7 @@ An intelligent writing assistant for screenwriters and long-form content creator
 
 | Service               | File                          | Purpose                                        |
 | --------------------- | ----------------------------- | ---------------------------------------------- |
+| DocumentParser        | `data/file_parser.py`       | Extract text from PDF/DOCX, clean metadata, split stories |
 | KnowledgeGraphEngine  | `knowledge_graph.py`        | spaCy NER + NetworkX story bible               |
 | ContradictionDetector | `contradiction_detector.py` | Rule-based fact conflict detection             |
 | StyleTransformer      | `style_transformer.py`      | Rule-based vocab swap + local T5-small rewrite |
@@ -130,6 +132,7 @@ An intelligent writing assistant for screenwriters and long-form content creator
 | Method    | Endpoint                | Description                                          |
 | --------- | ----------------------- | ---------------------------------------------------- |
 | GET       | `/`                   | Health check                                         |
+| POST      | `/api/projects/{id}/scripts/upload` | Upload document, extract clean text, split stories and save |
 | POST      | `/analyze`            | Full script analysis → story bible + enhancements   |
 | POST      | `/enhance`            | Paragraph-level enhancement with reason tags         |
 | POST      | `/transform-style`    | Apply tone/era transformation with intensity control |

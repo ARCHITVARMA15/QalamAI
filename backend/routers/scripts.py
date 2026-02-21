@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional
 from config.db_helpers import insert_document, find_by_id, find_many, update_document
 from datetime import datetime
+from data.file_parser import DocumentParser
 
 router = APIRouter()
 
@@ -48,6 +49,42 @@ async def create_script(project_id: str, script: ScriptCreate):
     }
     script_id = await insert_document("scripts", new_script)
     return {"status": "success", "script_id": script_id}
+
+@router.post("/projects/{project_id}/scripts/upload")
+async def upload_script(project_id: str, file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file uploaded")
+    
+    extracted_stories = await DocumentParser.process_file(file)
+    saved_script_ids = []
+    
+    # Process each detected story
+    for idx, story_text in enumerate(extracted_stories):
+        # Generate title: if single story, use filename. If multiple, append part number
+        title = file.filename
+        if len(extracted_stories) > 1:
+            title = f"{file.filename} - Part {idx + 1}"
+            
+        new_script = {
+            "project_id": project_id,
+            "title": title,
+            "content": story_text,
+            "version": 1,
+            "word_count": len(story_text.split()),
+            "language": "en",
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        script_id = await insert_document("scripts", new_script)
+        saved_script_ids.append(script_id)
+        
+    return {
+        "status": "success", 
+        "script_ids": saved_script_ids,
+        "title": file.filename,
+        "stories_detected": len(extracted_stories)
+    }
 
 @router.get("/scripts/{script_id}")
 async def get_script(script_id: str):

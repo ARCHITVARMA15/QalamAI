@@ -119,6 +119,7 @@ Below is the planned RESTful API structure for frontend integration.
 - `POST /api/projects` - Create a new project.
 - `GET /api/projects` - List all projects for the logged-in user.
 - `POST /api/projects/{project_id}/scripts` - Create a new script in a project.
+- `POST /api/projects/{project_id}/scripts/upload` - Upload a document (PDF/Word/TXT), extract clean text, auto-split anthologies, and save to database.
 - `GET /api/projects/{project_id}/scripts` - List all scripts in a project.
 - `GET /api/scripts/{script_id}` - Load the script into the editor.
 - `PUT /api/scripts/{script_id}` - Autosave the script content.

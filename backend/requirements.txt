@@ -40,3 +40,8 @@ ipywidgets
 
 spacy 
 networkx
+
+#file parsing 
+pymupdf
+python-docx
+python-multipart 
