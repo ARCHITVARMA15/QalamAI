@@ -44,22 +44,59 @@ export default function ProjectEditorPage() {
   const [aiResult, setAiResult] = useState<AIResult | null>(null);
   const [hasSelection, setHasSelection] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadResponse[]>([]);
+  const [activeScriptId, setActiveScriptId] = useState<string | null>(null);
   const [docTitle, setDocTitle] = useState("Untitled");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ─── Load project from localStorage ─────────────────────────────────────────
+  // ─── Load project from Backend ───────────────────────────────
   useEffect(() => {
-    const stored = localStorage.getItem("writeai_projects");
-    if (!stored) { setNotFound(true); return; }
-    const projects: Project[] = JSON.parse(stored);
-    const found = projects.find(p => p.id === projectId);
-    if (!found) { setNotFound(true); return; }
-    setProject(found);
-    setDocTitle("Untitled");
-    if (editorRef.current && found.content) {
-      editorRef.current.innerHTML = found.content;
-      countWords();
-    }
+    // 1. Fetch top-level project metadata
+    fetch(`http://localhost:8000/api/projects/${projectId}`)
+      .then(res => res.json())
+      .then(data => {
+        // Map backend _id to frontend id if needed
+        const mappedProject = { ...data, id: data._id || data.id };
+        setProject(mappedProject);
+        setDocTitle(data.title || "Untitled");
+
+        if (editorRef.current && data.content) {
+          editorRef.current.innerHTML = data.content;
+          countWords();
+        }
+      })
+      .catch(err => {
+        console.error("Project not found", err);
+        setNotFound(true);
+      });
+    // Fetch the latest script for this project from the backend
+    fetch(`http://localhost:8000/api/projects/${projectId}/scripts`)
+      .then(res => res.json())
+      .then(scripts => {
+        if (scripts && scripts.length > 0) {
+          // Found existing scripts, use the most recent one
+          const latestScript = scripts[0];
+          setActiveScriptId(latestScript._id || latestScript.id);
+          if (editorRef.current && latestScript.content) {
+            editorRef.current.innerHTML = latestScript.content;
+            countWords();
+          }
+        } else if (!activeScriptId) {
+          // No scripts found for this project, auto-create one
+          fetch(`http://localhost:8000/api/projects/${projectId}/scripts`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: "Untitled Document", content: "" })
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (data.status === "success" && data.script_id) {
+                setActiveScriptId(data.script_id);
+              }
+            })
+            .catch(err => console.error("Failed to init script:", err));
+        }
+      })
+      .catch(err => console.error("Failed to fetch scripts:", err));
   }, [projectId]);
 
   // ─── Word count ──────────────────────────────────────────────────────────────
@@ -82,16 +119,16 @@ export default function ProjectEditorPage() {
 
   // ─── Auto-save ───────────────────────────────────────────────────────────────
   const triggerSave = useCallback(() => {
-    if (!project) return;
+    if (!project || !activeScriptId) return;
     setIsSaved(false);
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
       const content = editorRef.current?.innerHTML || "";
       const wc = countWords();
-      await saveProject(project.id, content, wc);
+      await saveProject(activeScriptId, content, wc);
       setIsSaved(true);
     }, 1500);
-  }, [project, countWords]);
+  }, [project, countWords, activeScriptId]);
 
   const handleEditorInput = () => {
     countWords();
@@ -172,6 +209,10 @@ export default function ProjectEditorPage() {
   // ─── File upload handler ─────────────────────────────────────────────────────
   const handleFileUpload = useCallback((file: UploadResponse) => {
     setUploadedFiles(prev => [file, ...prev]);
+    // Set the active script ID to the ID returned from the backend
+    if (file.fileId && file.fileId.startsWith("file_") === false) {
+      setActiveScriptId(file.fileId);
+    }
     // Insert extracted text into editor
     if (file.extractedText && editorRef.current) {
       editorRef.current.innerHTML += `<hr/><p><strong>📎 ${file.fileName}</strong></p><p>${file.extractedText}</p>`;
@@ -209,11 +250,11 @@ export default function ProjectEditorPage() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'DM Sans', sans-serif; background: #faf7f4; }
 
-        .editor-content { outline: none; min-height: 60vh; }
-        .editor-content:empty::before { content: 'Type here…'; color: #b8b0a4; font-style: italic; }
-        .editor-content h1 { font-family: 'DM Serif Display', serif; font-size: 2rem; margin-bottom: 1rem; }
-        .editor-content h2 { font-family: 'DM Serif Display', serif; font-size: 1.5rem; margin-bottom: 0.75rem; }
-        .editor-content h3 { font-family: 'DM Serif Display', serif; font-size: 1.2rem; margin-bottom: 0.5rem; }
+        .editor-content { outline: none; min-height: 60vh; font-weight: 400; }
+        .editor-content:empty::before { content: 'Type here…'; color: #b8b0a4; font-style: italic; font-weight: 400; }
+        .editor-content h1 { font-family: 'DM Serif Display', serif; font-size: 2rem; margin-bottom: 1rem; font-weight: normal; }
+        .editor-content h2 { font-family: 'DM Serif Display', serif; font-size: 1.5rem; margin-bottom: 0.75rem; font-weight: normal; }
+        .editor-content h3 { font-family: 'DM Serif Display', serif; font-size: 1.2rem; margin-bottom: 0.5rem; font-weight: normal; }
         .editor-content p { margin-bottom: 1rem; }
         .editor-content ul, .editor-content ol { padding-left: 1.5rem; margin-bottom: 1rem; }
         .editor-content li { margin-bottom: 0.25rem; }
@@ -249,7 +290,7 @@ export default function ProjectEditorPage() {
           onMouseEnter={e => { e.currentTarget.style.background = "#f0ebe3"; e.currentTarget.style.color = "#1a1510"; }}
           onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#9e9589"; }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
           Back
         </button>
 
@@ -269,30 +310,30 @@ export default function ProjectEditorPage() {
 
 
 
-<button
-  onClick={() => router.push(`/projects/${projectId}/insight`)}
-  style={{
-    display: "flex", alignItems: "center", gap: "0.4rem",
-    padding: "0.4rem 0.9rem", borderRadius: "8px",
-    border: "1.5px solid #e8e2d9",
-    background: "#fff",
-    color: "#4a4540",
-    fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem",
-    cursor: "pointer", transition: "all 0.2s",
-  }}
-  onMouseEnter={(e) => {
-    e.currentTarget.style.borderColor = "#c96a3b";
-    e.currentTarget.style.color = "#c96a3b";
-    e.currentTarget.style.background = "rgba(201,106,59,0.04)";
-  }}
-  onMouseLeave={(e) => {
-    e.currentTarget.style.borderColor = "#e8e2d9";
-    e.currentTarget.style.color = "#4a4540";
-    e.currentTarget.style.background = "#fff";
-  }}
->
-  🕸️ Insight
-</button>
+        <button
+          onClick={() => router.push(`/projects/${projectId}/insight`)}
+          style={{
+            display: "flex", alignItems: "center", gap: "0.4rem",
+            padding: "0.4rem 0.9rem", borderRadius: "8px",
+            border: "1.5px solid #e8e2d9",
+            background: "#fff",
+            color: "#4a4540",
+            fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem",
+            cursor: "pointer", transition: "all 0.2s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "#c96a3b";
+            e.currentTarget.style.color = "#c96a3b";
+            e.currentTarget.style.background = "rgba(201,106,59,0.04)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "#e8e2d9";
+            e.currentTarget.style.color = "#4a4540";
+            e.currentTarget.style.background = "#fff";
+          }}
+        >
+          🕸️ Insight
+        </button>
 
 
         {/* Upload button */}
@@ -309,7 +350,7 @@ export default function ProjectEditorPage() {
           }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17,8 12,3 7,8" /><line x1="12" y1="3" x2="12" y2="15" />
           </svg>
           Upload {uploadedFiles.length > 0 && `(${uploadedFiles.length})`}
         </button>
@@ -320,7 +361,7 @@ export default function ProjectEditorPage() {
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.78rem", color: isSaved ? "#27ae60" : "#9e9589" }}>
           {isSaved
-            ? <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20,6 9,17 4,12"/></svg>Saved</>
+            ? <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20,6 9,17 4,12" /></svg>Saved</>
             : <><div style={{ width: "8px", height: "8px", borderRadius: "50%", border: "2px solid #9e9589", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />Saving…</>
           }
         </div>
@@ -328,7 +369,7 @@ export default function ProjectEditorPage() {
         {/* Settings */}
         <button style={{ width: "30px", height: "30px", borderRadius: "8px", border: "none", background: "transparent", cursor: "pointer", color: "#9e9589", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+            <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
           </svg>
         </button>
       </nav>
@@ -394,7 +435,7 @@ export default function ProjectEditorPage() {
               }}
             />
 
-              {/* <div style={{ marginTop: "2rem", paddingBottom: "3rem" }}>
+            {/* <div style={{ marginTop: "2rem", paddingBottom: "3rem" }}>
   <KnowledgeGraph
     projectId={projectId}
     editorContent={editorRef.current?.innerText || ""}

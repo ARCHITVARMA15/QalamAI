@@ -27,13 +27,15 @@ export default function InsightPage() {
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"graph" | "personas">("graph");
 
-  // Load project from localStorage
+  // Load project from backend API
   useEffect(() => {
-    const stored = localStorage.getItem("writeai_projects");
-    if (!stored) return;
-    const projects: Project[] = JSON.parse(stored);
-    const found = projects.find((p) => p.id === projectId);
-    if (found) setProject(found);
+    fetch(`http://localhost:8000/api/projects/${projectId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const mappedProject = { ...data, id: data._id || data.id };
+        setProject(mappedProject);
+      })
+      .catch((err) => console.error("Project not found", err));
   }, [projectId]);
 
   const handleAnalyze = async () => {
@@ -96,7 +98,7 @@ export default function InsightPage() {
           onMouseEnter={(e) => { e.currentTarget.style.background = "#f0ebe3"; e.currentTarget.style.color = "#1a1510"; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#9e9589"; }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
           Editor
         </button>
 

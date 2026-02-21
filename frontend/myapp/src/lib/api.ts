@@ -120,22 +120,30 @@ export async function callAIAction(req: AIRequest): Promise<AIResponse> {
  * Uploads file and returns extracted text + metadata
  */
 export async function uploadFile(file: File, projectId: string): Promise<UploadResponse> {
-  // TODO: Replace with real upload when backend is ready
-  // const formData = new FormData();
-  // formData.append("file", file);
-  // formData.append("projectId", projectId);
-  // const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, {
-  //   method: "POST",
-  //   body: formData,
-  // });
-  // if (!res.ok) throw new Error(await res.text());
-  // return res.json();
+  const formData = new FormData();
+  formData.append("file", file);
 
-  await mockDelay(800);
+  const res = await fetch(`http://localhost:8000/api/projects/${projectId}/scripts/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+
+  let extractedText = "";
+  if (data.script_ids && data.script_ids.length > 0) {
+    const scriptRes = await fetch(`http://localhost:8000/api/scripts/${data.script_ids[0]}`);
+    if (scriptRes.ok) {
+      const scriptData = await scriptRes.json();
+      extractedText = scriptData.content;
+    }
+  }
+
   return {
-    fileId: `file_${Date.now()}`,
-    fileName: file.name,
-    extractedText: `[Extracted content from ${file.name} — ${(file.size / 1024).toFixed(1)}KB]\n\nThis is where your backend will return the actual extracted text from the uploaded file. For PDFs, this will be the full text content. For images, this will be OCR output. For .txt files, the raw content.`,
+    fileId: data.script_ids?.[0] || `file_${Date.now()}`,
+    fileName: data.title || file.name,
+    extractedText: extractedText || `[Uploaded ${file.name}]`,
     fileType: file.type,
   };
 }
@@ -178,21 +186,14 @@ export async function sendChatMessage(
  * PATCH /api/projects/:id
  * Saves project content
  */
-export async function saveProject(projectId: string, content: string, wordCount: number): Promise<void> {
-  // TODO: Replace with real API call
-  // await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/${projectId}`, {
-  //   method: "PATCH",
-  //   headers: { "Content-Type": "application/json" },
-  //   body: JSON.stringify({ content, wordCount, updatedAt: Date.now() }),
-  // });
+export async function saveProject(scriptId: string, content: string, wordCount: number): Promise<void> {
+  const res = await fetch(`http://localhost:8000/api/scripts/${scriptId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
 
-  // For now, save to localStorage
-  const stored = localStorage.getItem("writeai_projects");
-  if (stored) {
-    const projects = JSON.parse(stored);
-    const updated = projects.map((p: { id: string }) =>
-      p.id === projectId ? { ...p, content, wordCount, updatedAt: Date.now() } : p
-    );
-    localStorage.setItem("writeai_projects", JSON.stringify(updated));
+  if (!res.ok) {
+    console.error("Failed to autosave to backend", await res.text());
   }
 }
