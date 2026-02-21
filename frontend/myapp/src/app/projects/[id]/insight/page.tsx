@@ -20,6 +20,7 @@ export default function InsightPage() {
   const projectId = params.id as string;
 
   const [project, setProject] = useState<Project | null>(null);
+  const [scriptContent, setScriptContent] = useState<string>("");
   const [graphData, setGraphData] = useState<KnowledgeGraphData | null>(null);
   const [personas, setPersonas] = useState<PersonaNode[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,11 +37,25 @@ export default function InsightPage() {
         setProject(mappedProject);
       })
       .catch((err) => console.error("Project not found", err));
+
+    // Load scripts to get the actual story content
+    fetch(`http://localhost:8000/api/projects/${projectId}/scripts`)
+      .then((res) => res.json())
+      .then((scripts) => {
+        if (scripts && scripts.length > 0) {
+          setScriptContent(scripts[0].content || "");
+        }
+      })
+      .catch((err) => console.error("Scripts not found", err));
   }, [projectId]);
 
   const handleAnalyze = async () => {
     if (!project) return;
-    const content = project.content || "Once upon a time in a forgotten kingdom, Elena and Marcus journeyed to Delhi seeking the Council's blessing. Amir betrayed them all.";
+    const content = scriptContent || "";
+    if (!content.trim()) {
+      alert("No story content found to analyze! Please write your story in the Editor first.");
+      return;
+    }
     setLoading(true);
     try {
       const [graph, personaData] = await Promise.all([

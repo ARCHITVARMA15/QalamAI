@@ -2,14 +2,12 @@ import spacy
 from typing import List, Dict, Any
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from services.knowledge_graph import KnowledgeGraphEngine
 
 class ContradictionDetector:
-    def __init__(self, kg_engine: KnowledgeGraphEngine):
+    def __init__(self):
         """
-        Initialize the Contradiction Detector with a reference to the Knowledge Graph.
+        Initialize the Contradiction Detector.
         """
-        self.kg_engine = kg_engine
         try:
             self.nlp = spacy.load("en_core_web_sm")
         except OSError:
@@ -17,7 +15,7 @@ class ContradictionDetector:
         
         self.vectorizer = TfidfVectorizer()
 
-    def check_sentence(self, sentence: str, scene_id: str) -> List[Dict[str, str]]:
+    def check_sentence(self, sentence: str, existing_nodes: List[Dict], existing_links: List[Dict]) -> List[Dict[str, str]]:
         """
         Checks a new sentence against the existing Story Bible for contradictions.
         Returns a list of flags if contradictions are found.
@@ -41,24 +39,25 @@ class ContradictionDetector:
         # Find matching entities in the Knowledge Graph
         # We look at all nodes to see if our subject matches any existing entity
         target_entity = None
-        for node in self.kg_engine.graph.nodes():
-            if subj_text in node or node in subj_text:
-                target_entity = node
+        for node in existing_nodes:
+            node_id = node.get("id", "")
+            if subj_text in node_id or node_id in subj_text:
+                target_entity = node_id
                 break
                 
         if not target_entity:
             return flags # Entity not in the graph yet, so it can't contradict existing facts
             
         # 2. Retrieve existing facts (edges) for this entity
-        # We look for Out-Edges where the entity is the source
-        existing_edges = list(self.kg_engine.graph.out_edges(target_entity, data=True))
+        # We look for links where the entity is the source
+        existing_edges = [link for link in existing_links if link.get("source") == target_entity]
         
         if not existing_edges:
             return flags
             
         # 3. Rule-based + Semantic check
         # We compare the new sentence against the source sentences of existing edges
-        existing_sentences = [edge[2].get('sentence', '') for edge in existing_edges]
+        existing_sentences = [edge.get('sentence', '') for edge in existing_edges]
         if not existing_sentences:
             return flags
             
@@ -71,7 +70,7 @@ class ContradictionDetector:
         for idx, similarity in enumerate(cosine_sims):
             if similarity > 0.15: # Threshold for semantic overlap
                 existing_fact = existing_sentences[idx]
-                existing_edge_data = existing_edges[idx][2]
+                existing_edge_data = existing_edges[idx]
                 existing_verb = existing_edge_data.get('relation', '')
                 
                 # Check for direct contradictions (e.g., opposite polarity or mutually exclusive states)

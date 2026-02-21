@@ -20,7 +20,7 @@ async def connect_db():
     global client
     client = AsyncIOMotorClient(MONGODB_URL)
     db = client[DATABASE_NAME]
-    print(f"✅ Connected to MongoDB: {DATABASE_NAME}")
+    print(f"[OK] Connected to MongoDB: {DATABASE_NAME}")
     await create_indexes(db)
 
 
@@ -29,7 +29,7 @@ async def close_db():
     global client
     if client:
         client.close()
-        print("🔌 MongoDB connection closed.")
+        print("[INFO] MongoDB connection closed.")
 
 
 def get_database():
@@ -50,4 +50,4 @@ async def create_indexes(db):
     await db["contradictions"].create_index([("script_id", ASCENDING)])
     await db["enhancements"].create_index([("script_id", ASCENDING)])
     await db["style_fingerprints"].create_index([("user_id", ASCENDING)])
-    print("📇 Indexes created successfully.")
+    print("[INFO] Indexes created successfully.")

@@ -10,14 +10,14 @@ class KnowledgeGraphEngine:
         except OSError:
             raise RuntimeError("spaCy model 'en_core_web_sm' not found. Please run: python -m spacy download en_core_web_sm")
         
-        # Initialize the knowledge graph (Story Bible)
-        self.graph = nx.MultiDiGraph()
-        
-    def process_text(self, text: str, scene_id: str = "scene_1") -> None:
+    def process_text(self, text: str, scene_id: str = "scene_1") -> Dict[str, Any]:
         """
         Process the text to extract entities and their relationships, 
         and add them to the knowledge graph.
         """
+        # Initialize the knowledge graph for this session
+        graph = nx.MultiDiGraph()
+        
         doc = self.nlp(text)
         
         # 1. Extract Entities (Nodes)
@@ -32,12 +32,12 @@ class KnowledgeGraphEngine:
                 entities[ent_text] = ent.label_
                 
                 # Add node to the graph if it doesn't already exist
-                if not self.graph.has_node(ent_text):
-                    self.graph.add_node(ent_text, type=ent.label_, mentions=[])
+                if not graph.has_node(ent_text):
+                    graph.add_node(ent_text, type=ent.label_, mentions=[])
                 
                 # Track which scene this entity was mentioned in
-                if scene_id not in self.graph.nodes[ent_text]["mentions"]:
-                    self.graph.nodes[ent_text]["mentions"].append(scene_id)
+                if scene_id not in graph.nodes[ent_text]["mentions"]:
+                    graph.nodes[ent_text]["mentions"].append(scene_id)
                 
         # 2. Extract Basic Relationships (Edges)
         # We use standard subject-verb-object extraction from dependency parsing as a heuristic
@@ -58,7 +58,9 @@ class KnowledgeGraphEngine:
                 
                 if subj_ent and obj_ent and subj_ent != obj_ent:
                     # Add a directed edge representing the relationship
-                    self.graph.add_edge(subj_ent, obj_ent, relation=verb, scene_id=scene_id, sentence=sent.text.strip())
+                    graph.add_edge(subj_ent, obj_ent, relation=verb, scene_id=scene_id, sentence=sent.text.strip())
+        
+        return nx.node_link_data(graph)
                     
     def _find_matching_entity(self, token_text: str, entities: Dict[str, str]) -> str:
         """
@@ -71,8 +73,4 @@ class KnowledgeGraphEngine:
                 return ent_name
         return None
 
-    def get_graph_data(self) -> Dict[str, Any]:
-        """
-        Export the graph data into a JSON-serializable format suitable for D3.js visualization.
-        """
-        return nx.node_link_data(self.graph)
+        return None

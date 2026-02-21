@@ -55,6 +55,15 @@ export async function fetchKnowledgeGraph(
   content: string,
   projectId: string
 ): Promise<KnowledgeGraphData> {
+  // 1. Analyze the content to update the knowledge graph
+  const analyzeRes = await fetch(`http://localhost:8000/api/scripts/${projectId}/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: content }),
+  });
+  if (!analyzeRes.ok) throw new Error(await analyzeRes.text());
+
+  // 2. Fetch the updated knowledge graph
   const res = await fetch(`http://localhost:8000/api/scripts/${projectId}/story_bible`);
   if (!res.ok) throw new Error(await res.text());
 

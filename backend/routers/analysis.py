@@ -6,35 +6,51 @@ from config.db import get_database
 # Import our AI Engines
 from services.knowledge_graph import KnowledgeGraphEngine
 from services.contradiction_detector import ContradictionDetector
+from services.persona_generator import PersonaGenerator
+from services.style_transformer import StyleTransformer
+from services.enhancement_service import EnhancementService
 
 router = APIRouter()
+
+# Initialize models once at startup (module level) to avoid reloading spaCy per request
+try:
+    kg_engine = KnowledgeGraphEngine()
+    detector = ContradictionDetector()
+    persona_gen = PersonaGenerator()
+    style_transformer = StyleTransformer()
+    enhancement_service = EnhancementService()
+except Exception as e:
+    print(f"Error loading NLP engines: {e}")
 
 class AnalyzeRequest(BaseModel):
     text: str
 
+class PersonaRequest(BaseModel):
+    content: str
+    
+class AIActionRequest(BaseModel):
+    content: str
+    tone: str = "formal"
+
 @router.post("/scripts/{script_id}/analyze")
 async def analyze_script(script_id: str, request: AnalyzeRequest):
-    # Option B: Initialize models inside the route
-    try:
-        kg_engine = KnowledgeGraphEngine()
-        detector = ContradictionDetector(kg_engine)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load AI models: {str(e)}")
-
-    # 1. Contradiction Detection
-    # Run the new text against the existing graph to find logic errors
-    flags = detector.check_sentence(request.text, scene_id="current_scene")
-
-    # 2. Knowledge Graph Update
-    # Process the text to extract entities and relationships
-    kg_engine.process_text(request.text, scene_id="current_scene")
-    
-    # Export the graph data into a JSON structure
-    graph_data = kg_engine.get_graph_data()
 
     db = get_database()
     
-    # 3. Save the Story Bible to MongoDB (Upsert logic to create or update)
+    # 1. Fetch current graph to detect contradictions against
+    existing_bible = await db["story_bibles"].find_one({"script_id": script_id})
+    existing_nodes = existing_bible.get("nodes", []) if existing_bible else []
+    existing_links = existing_bible.get("links", []) if existing_bible else []
+
+    # 2. Contradiction Detection
+    # Run the new text against the existing graph to find logic errors
+    flags = detector.check_sentence(request.text, existing_nodes=existing_nodes, existing_links=existing_links)
+
+    # 3. Knowledge Graph Update
+    # Process the ENTIRE text to extract entities and relationships (Stateless)
+    graph_data = kg_engine.process_text(request.text, scene_id="current_scene")
+
+    # 4. Save the Story Bible to MongoDB (Upsert logic to create or update)
     # We store the nodes (characters/locations) and links (relationships)
     bible_data = {
         "script_id": script_id,
@@ -72,7 +88,7 @@ async def analyze_script(script_id: str, request: AnalyzeRequest):
 async def get_story_bible(script_id: str):
     bibles = await find_many("story_bibles", {"script_id": script_id})
     if not bibles:
-        return {"characters": {}, "locations": [], "timeline_events": []}
+        return {"nodes": [], "links": []}
     return bibles[0]
 
 @router.get("/scripts/{script_id}/contradictions")
@@ -96,3 +112,50 @@ async def accept_enhancement(enhance_id: str):
     if not updated:
         raise HTTPException(status_code=400, detail="Failed to update enhancement")
     return {"status": "success"}
+
+@router.post("/scripts/{script_id}/personas")
+async def extract_personas(script_id: str, request: PersonaRequest):
+    """
+    Generate character personas from text using the PersonaGenerator.
+    """
+    try:
+        personas_data = persona_gen.generate_personas(request.content)
+        # Note: We aren't saving to DB here per frontend needs, just returning the extraction
+        return personas_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/enhance")
+async def enhance_content(request: AIActionRequest):
+    """
+    Endpoint for sentence/paragraph logic/flow enhancement.
+    """
+    result = enhancement_service.enhance_paragraph(request.content)
+    
+    # Format to match frontend AIResponse interface
+    return {
+        "result": result["modified"],
+        "changes": [
+            {
+                "type": tag["type"],
+                "description": tag["detail"]
+            } for tag in result["reason_tags"]
+        ]
+    }
+
+@router.post("/transform-style")
+async def transform_style(request: AIActionRequest):
+    """
+    Endpoint for style and tone transformation using T5 and rules.
+    """
+    result = style_transformer.transform_style(request.content, request.tone)
+    
+    return {
+        "result": result["modified"],
+        "changes": [
+            {
+                "type": tag["type"],
+                "description": tag["detail"]
+            } for tag in result["reason_tags"]
+        ]
+    }

@@ -54,14 +54,25 @@ const mockDelay = (ms = 1200) => new Promise((res) => setTimeout(res, ms));
  * Performs AI writing actions (write, rewrite, describe, brainstorm, enhance, tone)
  */
 export async function callAIAction(req: AIRequest): Promise<AIResponse> {
-  // TODO: Replace with real API call when backend is ready
-  // const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/action`, {
-  //   method: "POST",
-  //   headers: { "Content-Type": "application/json" },
-  //   body: JSON.stringify(req),
-  // });
-  // if (!res.ok) throw new Error(await res.text());
-  // return res.json();
+  if (req.action === "enhance") {
+    const res = await fetch(`http://localhost:8000/api/enhance`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: req.content }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  }
+
+  if (req.action === "tone") {
+    const res = await fetch(`http://localhost:8000/api/transform-style`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: req.content, tone: req.tone || "formal" }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  }
 
   await mockDelay();
 
@@ -92,20 +103,6 @@ export async function callAIAction(req: AIRequest): Promise<AIResponse> {
         "The setting itself could become a character — a city that remembers, a house that forgets.",
         "Consider a non-linear timeline where the ending is revealed at the midpoint.",
       ],
-    },
-    enhance: {
-      result: req.content || "No content to enhance.",
-      changes: [
-        { type: "flow", description: "Smoothed transitions between paragraphs" },
-        { type: "consistency", description: "Aligned narrative tense throughout" },
-        { type: "clarity", description: "Simplified overly complex sentences without losing meaning" },
-      ],
-    },
-    tone: {
-      result: req.content
-        ? `[Tone adjusted to ${req.tone || "neutral"}]\n\n${req.content}`
-        : "No content to adjust.",
-      changes: [{ type: "tone", description: `Transformed writing style to match "${req.tone}" register` }],
     },
     chat: {
       result: "That's an interesting direction for your story. Based on what you've written so far, I'd suggest developing the secondary characters more — they can act as mirrors for your protagonist's internal conflict. Would you like me to suggest some character dynamics?",
