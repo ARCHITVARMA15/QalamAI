@@ -3,9 +3,14 @@ import Button from "@/components/ui/Button";
 
  function Navbar() {
   return (
-    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur">
+    // <header className="sticky top-0 z-50 bg-white/80 backdrop-blur">
+     <header className="sticky top-0 z-50 bg-[#f6f4ef]/80 backdrop-blur">
+   
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <div className="text-lg font-semibold">KalamAI</div>
+        {/* <div className="text-lg font-semibold" style={{ color: "#1a7a5e" }}>KalamAI</div> */}
+        <div className="text-2xl font-extrabold tracking-tight" style={{ color: "#1a7a5e" }}>
+  KalamAI
+</div>
 
         <ul className="hidden gap-8 text-sm text-gray-600 md:flex">
           <li className="cursor-pointer hover:text-black">Features</li>

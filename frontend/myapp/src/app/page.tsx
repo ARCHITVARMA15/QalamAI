@@ -7,6 +7,7 @@ import Features from "@/components/landing/Features";
 import HowItWorks from "@/components/landing/HowItWorks";
 import Testimonials from "@/components/landing/Testimonials";
 import CTA from "@/components/landing/CTA";
+import CardCarouselParent from "@/components/homeCards/CardCarouselParent";
 
 export default function Home() {
   return (
@@ -14,8 +15,9 @@ export default function Home() {
       <Navbar />
       <Hero />
       <Features />
+      <CardCarouselParent/>
       <HowItWorks />
-      <Testimonials />
+      {/* <Testimonials /> */}
       <CTA />
       <Footer />
     </>
