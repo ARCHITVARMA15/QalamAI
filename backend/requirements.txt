@@ -6,6 +6,8 @@ pydantic-settings
 python-multipart
 python-dotenv
 httpx
+motor 
+pymongo
 
 # Machine Learning & Deep Learning Core
 torch
@@ -21,6 +23,7 @@ trl
 bitsandbytes
 safetensors
 einops
+scikit-learn
 
 # Tokenizers & Data Processing
 sentencepiece
@@ -29,4 +32,11 @@ scipy
 numpy
 pandas
 
+# Jupyter & Interactive Notebooks
+notebook
+jupyterlab
+ipykernel
+ipywidgets
 
+spacy 
+networkx
