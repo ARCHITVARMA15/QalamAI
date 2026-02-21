@@ -571,17 +571,17 @@ interface AIResult {
 function getCommitMessage(action: string, selectedText?: string): string {
   const preview = selectedText ? ` "${selectedText.slice(0, 40)}${selectedText.length > 40 ? "…" : ""}"` : "";
   const map: Record<string, string> = {
-    write:      "AI wrote new content",
-    rewrite:    `Rewrote passage${preview}`,
-    describe:   "AI added description",
+    write: "AI wrote new content",
+    rewrite: `Rewrote passage${preview}`,
+    describe: "AI added description",
     brainstorm: "Brainstormed story directions",
-    enhance:    `Enhanced writing${preview}`,
-    tone:       "Applied tone transformation",
-    shorten:    "Shortened passage",
-    expand:     "Expanded passage",
-    summarize:  "Summarized section",
-    upload:     "Uploaded file and extracted content",
-    insight:    "Ran knowledge graph analysis",
+    enhance: `Enhanced writing${preview}`,
+    tone: "Applied tone transformation",
+    shorten: "Shortened passage",
+    expand: "Expanded passage",
+    summarize: "Summarized section",
+    upload: "Uploaded file and extracted content",
+    insight: "Ran knowledge graph analysis",
   };
   return map[action] || `Applied ${action}`;
 }
@@ -656,6 +656,25 @@ export default function ProjectEditorPage() {
       })
       .catch(err => console.error("Failed to fetch scripts:", err));
   }, [projectId]);
+
+  // ─── Auto-trigger Knowledge Graph Analysis ───────────────────────────────────
+  useEffect(() => {
+    if (!activeScriptId || !editorRef.current) return;
+
+    // Wait for content to render into the editor ref before analyzing
+    const timer = setTimeout(() => {
+      const content = editorRef.current?.innerText || "";
+      if (content.trim().length > 10) {
+        fetch(`http://localhost:8000/api/scripts/${activeScriptId}/analyze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: content }),
+        }).catch(err => console.error("Failed to auto-analyze project:", err));
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [activeScriptId]);
 
   // ─── Record "opened project" commit once ────────────────────────────────────
   useEffect(() => {

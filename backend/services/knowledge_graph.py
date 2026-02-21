@@ -33,50 +33,69 @@ class KnowledgeGraphEngine:
                 
                 # Add node to the graph if it doesn't already exist
                 if not graph.has_node(ent_text):
-                    graph.add_node(ent_text, type=ent.label_, mentions=[])
+                    graph.add_node(ent_text, type=ent.label_, mentions=[scene_id], count=1)
+                else:
+                    graph.nodes[ent_text]["count"] = graph.nodes[ent_text].get("count", 0) + 1
+                    # Track which scene this entity was mentioned in
+                    if scene_id not in graph.nodes[ent_text]["mentions"]:
+                        graph.nodes[ent_text]["mentions"].append(scene_id)
                 
-                # Track which scene this entity was mentioned in
-                if scene_id not in graph.nodes[ent_text]["mentions"]:
-                    graph.nodes[ent_text]["mentions"].append(scene_id)
-                
-        # 2. Extract Relationships (Edges) & Attributes
-        for sent in doc.sents:
-            # Reconstruct attributes (e.g., Arjun has blue eyes -> Arjun -(has)-> eyes(blue))
-            # Find all verbs in the sentence
-            verbs = [tok for tok in sent if tok.pos_ == "VERB" or tok.lemma_ == "have" or tok.lemma_ == "be"]
-            
-            for action in verbs:
-                # Find direct subjects and objects of THIS SPECIFIC verb
-                subjects = [tok for tok in action.children if "subj" in tok.dep_]
-                objects = [tok for tok in action.children if "obj" in tok.dep_ or tok.dep_ == "attr" or tok.dep_ == "acomp"]
-                
-                # If there are conjunctions, also grab them (e.g. Arjun and Karan ran)
-                for subj in list(subjects):
-                    subjects.extend([t for t in subj.conjuncts])
-                for obj in list(objects):
-                    objects.extend([t for t in obj.conjuncts])
-
-                if subjects and objects:
-                    for subj in subjects:
-                        for obj in objects:
-                            subj_text = subj.text
-                            
-                            # Build a compound object text if adjectives are attached (e.g., "blue eyes")
-                            obj_mods = [t.text for t in obj.children if t.pos_ == "ADJ"]
-                            obj_text = f"{' '.join(obj_mods)} {obj.text}".strip() if obj_mods else obj.text
-
-                            subj_ent = self._find_matching_entity(subj_text, entities)
-                            # If the object isn't a named entity, we can still add it as a trait/item node
-                            obj_ent = self._find_matching_entity(obj_text, entities) or obj_text
-                            
-                            if subj_ent and obj_ent and subj_ent != obj_ent:
-                                # Add the object as an attribute/item node if it wasn't a formal entity
-                                if not graph.has_node(obj_ent):
-                                    graph.add_node(obj_ent, type="ATTRIBUTE", mentions=[scene_id])
-                                
-                                graph.add_edge(subj_ent, obj_ent, relation=action.lemma_, scene_id=scene_id, sentence=sent.text.strip())
+        # 2. Extract Relationships (Edges) - Co-occurrence within sentences
+        known_entity_names = list(entities.keys())
         
-        return nx.node_link_data(graph)
+        for sent in doc.sents:
+            # Find which known global entities appear in this sentence
+            # We use this instead of `sent.ents` because spaCy often misses entities in complex sentences
+            sent_text = sent.text
+            found_ents_in_sent = []
+            for ent_name in known_entity_names:
+                if ent_name in sent_text:
+                    found_ents_in_sent.append(ent_name)
+            
+            # Find the main verb/action of the sentence for the relation label
+            main_verbs = [tok for tok in sent if tok.pos_ == "VERB" or tok.dep_ == "ROOT"]
+            relation_label = main_verbs[0].lemma_ if main_verbs else "interacts with"
+            
+            # If there are at least 2 entities in the sentence, link them all together
+            if len(found_ents_in_sent) >= 2:
+                # Create edges between all unique pairs in the sentence
+                for i in range(len(found_ents_in_sent)):
+                    for j in range(len(found_ents_in_sent)):
+                        if i != j:
+                            source_text = found_ents_in_sent[i]
+                            target_text = found_ents_in_sent[j]
+                            
+                            # Only link if they are distinct entities
+                            if source_text != target_text:
+                                graph.add_edge(
+                                    source_text, 
+                                    target_text, 
+                                    relation=relation_label, 
+                                    scene_id=scene_id, 
+                                    sentence=sent.text.strip()
+                                )
+        
+        # NetworkX 3.x changed the output format of node_link_data. 
+        # To strictly enforce the schema our frontend and DB expects, we serialize it manually.
+        nodes_list = []
+        for n, data in graph.nodes(data=True):
+            node_data = {"id": n}
+            node_data.update(data)
+            nodes_list.append(node_data)
+            
+        links_list = []
+        for u, v, data in graph.edges(data=True):
+            link_data = {"source": u, "target": v}
+            link_data.update(data)
+            links_list.append(link_data)
+            
+        return {
+            "directed": True,
+            "multigraph": True,
+            "graph": {},
+            "nodes": nodes_list,
+            "links": links_list
+        }
                     
     def _find_matching_entity(self, token_text: str, entities: Dict[str, str]) -> str:
         """

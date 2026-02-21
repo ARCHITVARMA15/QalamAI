@@ -69,6 +69,7 @@ async def analyze_script(script_id: str, request: AnalyzeRequest):
             existing_mentions = set(existing_nodes_dict[node_id].get("mentions", []))
             new_mentions = set(new_node.get("mentions", []))
             existing_nodes_dict[node_id]["mentions"] = list(existing_mentions.union(new_mentions))
+            existing_nodes_dict[node_id]["count"] = new_node.get("count", 1)
         else:
             existing_nodes_dict[node_id] = new_node
             
