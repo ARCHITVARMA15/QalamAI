@@ -1,0 +1,42 @@
+# FastAPI Backend Core
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-multipart
+python-dotenv
+httpx
+motor 
+pymongo
+
+# Machine Learning & Deep Learning Core
+torch
+torchvision
+torchaudio
+
+# Model Fine-tuning & LLM Ecosystem
+transformers
+datasets
+accelerate
+peft
+trl
+bitsandbytes
+safetensors
+einops
+scikit-learn
+
+# Tokenizers & Data Processing
+sentencepiece
+protobuf
+scipy
+numpy
+pandas
+
+# Jupyter & Interactive Notebooks
+notebook
+jupyterlab
+ipykernel
+ipywidgets
+
+spacy 
+networkx
