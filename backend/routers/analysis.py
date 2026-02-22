@@ -17,14 +17,30 @@ from ai.flow import orchestrate_analysis
 router = APIRouter()
 
 # Initialize models once at startup (module level) to avoid reloading spaCy per request
+kg_engine = None
+detector = None
+persona_gen = None
+enhancement_service = None
+
 try:
     kg_engine = KnowledgeGraphEngine()
+except Exception as e:
+    print(f"Error loading KnowledgeGraphEngine: {e}")
+
+try:
     detector = ContradictionDetector()
+except Exception as e:
+    print(f"Error loading ContradictionDetector: {e}")
+
+try:
     persona_gen = PersonaGenerator()
-    # style_transformer = StyleTransformer()
+except Exception as e:
+    print(f"Error loading PersonaGenerator: {e}")
+
+try:
     enhancement_service = EnhancementService()
 except Exception as e:
-    print(f"Error loading NLP engines: {e}")
+    print(f"Error loading EnhancementService: {e}")
 
 class AnalyzeRequest(BaseModel):
     text: str

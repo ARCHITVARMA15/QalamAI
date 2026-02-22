@@ -4,6 +4,7 @@ export interface KGNode {
   id: string;
   type: string;
   mentions: string[];
+  count?: number;
 }
 
 export interface KGLink {
@@ -48,18 +49,23 @@ export interface PositionedNode extends KGNode {
 
 // ─── Knowledge Graph API ─────────────────────────────────────────────────────
 /**
- * POST /api/knowledge-graph
- * Sends story content → backend runs NLP → returns nx.node_link_data() format
+ * 1. POST /api/scripts/{scriptId}/analyze  — runs NLP to build/update story bible
+ * 2. GET  /api/scripts/{scriptId}/story_bible — fetches the computed graph
  */
 export async function fetchKnowledgeGraph(
   content: string,
-  projectId: string
+  scriptId: string
 ): Promise<KnowledgeGraphData> {
-  // The NLP analysis is already triggered automatically when the editor loads
-  // or when the user clicks 'Analyze'. We just need to fetch the computed result.
+  // Step 1: Run the analyze endpoint to process the text and update the story bible
+  const analyzeRes = await fetch(`http://localhost:8000/api/scripts/${scriptId}/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: content }),
+  });
+  if (!analyzeRes.ok) throw new Error(await analyzeRes.text());
 
-  // 2. Fetch the updated knowledge graph
-  const res = await fetch(`http://localhost:8000/api/scripts/${projectId}/story_bible`);
+  // Step 2: Fetch the updated knowledge graph
+  const res = await fetch(`http://localhost:8000/api/scripts/${scriptId}/story_bible`);
   if (!res.ok) throw new Error(await res.text());
 
   const data = await res.json();
@@ -75,15 +81,14 @@ export async function fetchKnowledgeGraph(
 
 // ─── Persona API ─────────────────────────────────────────────────────────────
 /**
- * POST /api/personas
+ * POST /api/scripts/{scriptId}/personas
  * Sends story content → backend extracts character personas → returns PersonaData[]
- * Backend returns exactly the JSON format shown in requirements (id, mentions, traits[])
  */
 export async function fetchPersonas(
   content: string,
-  projectId: string
+  scriptId: string
 ): Promise<PersonaData[]> {
-  const res = await fetch(`http://localhost:8000/api/scripts/${projectId}/personas`, {
+  const res = await fetch(`http://localhost:8000/api/scripts/${scriptId}/personas`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content }),

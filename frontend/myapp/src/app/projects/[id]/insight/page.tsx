@@ -21,6 +21,7 @@ export default function InsightPage() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [scriptContent, setScriptContent] = useState<string>("");
+  const [scriptId, setScriptId] = useState<string>("");
   const [graphData, setGraphData] = useState<KnowledgeGraphData | null>(null);
   const [personas, setPersonas] = useState<PersonaNode[]>([]);
   const [loading, setLoading] = useState(false);
@@ -28,7 +29,7 @@ export default function InsightPage() {
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"graph" | "personas">("graph");
 
-  // Load project from backend API
+  // Load project + scripts from backend API
   useEffect(() => {
     fetch(`http://localhost:8000/api/projects/${projectId}`)
       .then((res) => res.json())
@@ -38,19 +39,54 @@ export default function InsightPage() {
       })
       .catch((err) => console.error("Project not found", err));
 
-    // Load scripts to get the actual story content
+    // Load scripts to get the actual story content AND the scriptId
     fetch(`http://localhost:8000/api/projects/${projectId}/scripts`)
       .then((res) => res.json())
       .then((scripts) => {
         if (scripts && scripts.length > 0) {
-          setScriptContent(scripts[0].content || "");
+          const firstScript = scripts[0];
+          setScriptContent(firstScript.content || "");
+          // Store the actual script ID (MongoDB _id)
+          const sid = firstScript._id || firstScript.id;
+          setScriptId(sid);
+
+          // Auto-load existing graph data if available
+          fetch(`http://localhost:8000/api/scripts/${sid}/story_bible`)
+            .then((r) => r.json())
+            .then((bible) => {
+              if (bible && bible.nodes && bible.nodes.length > 0) {
+                setGraphData({
+                  directed: true,
+                  multigraph: true,
+                  graph: {},
+                  nodes: bible.nodes,
+                  links: bible.links || [],
+                });
+                setAnalyzed(true);
+              }
+            })
+            .catch(() => { });
+
+          // Auto-load existing personas
+          fetch(`http://localhost:8000/api/scripts/${sid}/personas`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: firstScript.content || "" }),
+          })
+            .then((r) => r.json())
+            .then((personaData) => {
+              if (personaData && personaData[0]?.nodes?.length > 0) {
+                setPersonas(personaData[0].nodes);
+              }
+            })
+            .catch(() => { });
         }
       })
       .catch((err) => console.error("Scripts not found", err));
   }, [projectId]);
 
   const handleAnalyze = async () => {
-    if (!project) return;
+    if (!project || !scriptId) return;
     const content = scriptContent || "";
     if (!content.trim()) {
       alert("No story content found to analyze! Please write your story in the Editor first.");
@@ -59,8 +95,8 @@ export default function InsightPage() {
     setLoading(true);
     try {
       const [graph, personaData] = await Promise.all([
-        fetchKnowledgeGraph(content, projectId),
-        fetchPersonas(content, projectId),
+        fetchKnowledgeGraph(content, scriptId),
+        fetchPersonas(content, scriptId),
       ]);
       setGraphData(graph);
       setPersonas(personaData[0]?.nodes || []);
@@ -179,7 +215,6 @@ export default function InsightPage() {
         <div style={{
           flex: 1, display: "flex", flexDirection: "column",
           borderRight: "1px solid #e8e2d9", overflow: "hidden",
-          // Mobile: hide if personas tab active
         }}>
           {/* Panel header */}
           <div style={{ padding: "1rem 1.5rem 0.75rem", borderBottom: "1px solid #e8e2d9", background: "#faf7f4", flexShrink: 0 }}>
@@ -235,7 +270,7 @@ export default function InsightPage() {
         </div>
 
         {/* ── RIGHT: Persona Cards ── */}
-        <div style={{ width: "360px", flexShrink: 0, display: "flex", flexDirection: "column", background: "#faf7f4", overflow: "hidden" }}>
+        <div style={{ width: "380px", flexShrink: 0, display: "flex", flexDirection: "column", background: "#faf7f4", overflow: "hidden" }}>
           {/* Panel header */}
           <div style={{ padding: "1rem 1.25rem 0.75rem", borderBottom: "1px solid #e8e2d9", flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -273,6 +308,7 @@ export default function InsightPage() {
             {!loading && (
               <PersonaCards
                 personas={personas}
+                graphData={graphData}
                 highlightedId={highlightedId}
                 onCardClick={(id) => setHighlightedId(highlightedId === id ? null : id)}
               />
