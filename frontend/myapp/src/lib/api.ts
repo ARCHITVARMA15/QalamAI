@@ -185,3 +185,64 @@ export async function generateComicImage(scriptId: string, selectedText: string)
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+// ─── Plot Tweak ─────────────────────────────────────────────────────────────
+
+export interface TweakPlotResponse {
+  result: string;
+  warnings: string[];
+  changes: { type: string; description: string }[];
+}
+
+/**
+ * POST /api/analysis/tweak-plot
+ * Rewrites a passage to apply a retroactive plot change,
+ * grounded in the Knowledge Graph to avoid new contradictions.
+ */
+export async function tweakPlot(
+  scriptId: string,
+  originalText: string,
+  tweakInstruction: string,
+): Promise<TweakPlotResponse> {
+  const res = await fetch(`http://localhost:8000/api/analysis/tweak-plot`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      script_id: scriptId,
+      original_text: originalText,
+      tweak_instruction: tweakInstruction,
+    }),
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// ─── Writing Mode — Auto-Suggest Tweaks ────────────────────────────────────
+
+export interface AutoSuggestResponse {
+  suggestions: string[];
+  changes: { type: string; description: string }[];
+}
+
+/**
+ * POST /api/analysis/auto-suggest-tweaks
+ * Proactively scans the writer's recent output against the story bible
+ * and returns up to 4 specific continuity/consistency suggestions.
+ */
+export async function autoSuggestTweaks(
+  scriptId: string,
+  recentText: string,
+): Promise<AutoSuggestResponse> {
+  const res = await fetch(`http://localhost:8000/api/analysis/auto-suggest-tweaks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      script_id: scriptId,
+      recent_text: recentText,
+    }),
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

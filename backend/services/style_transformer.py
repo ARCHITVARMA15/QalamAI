@@ -1,12 +1,8 @@
 import spacy
 import logging
-from typing import Tuple, List, Dict
+from typing import Tuple, List
 
-try:
-    from transformers import pipeline
-except ImportError as e:
-    pipeline = None
-    print(f"Transformers not installed or failed to import: {e}")
+
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -14,22 +10,9 @@ logger = logging.getLogger(__name__)
 class StyleTransformer:
     def __init__(self):
         """
-        Initializes the Style Transformer with a local T5-small model and spaCy.
+        Initializes the Style Transformer with spaCy for rule-based matching.
         """
-        logger.info("Loading T5-small for style transformation...")
-        self.model = None
-        if pipeline is not None:
-            try:
-                # We use t5-small as per the LLM Usage Policy (local, lightweight)
-                # Note: 'translation_en_to_fr' forces the T5ForConditionalGeneration pipeline 
-                # to load properly, we control the actual task via prompt prefix
-                self.model = pipeline(
-                    "translation_en_to_fr", 
-                    model="t5-small", 
-                    device=-1 # CPU for now, can be updated to 0 for GPU if available
-                )
-            except Exception as e:
-                logger.error(f"Failed to load T5-small: {e}")
+        logger.info("Initializing Style Transformer...")
 
         try:
             self.nlp = spacy.load("en_core_web_sm")
@@ -60,7 +43,7 @@ class StyleTransformer:
 
     def transform_style(self, text: str, tone: str) -> dict:
         """
-        Transforms the text to the requested tone using T5-small and rule-based fallback.
+        Transforms the text to the requested tone using rule-based vocabulary swaps.
         Returns the modified text and reason tags.
         """
         if not text:
@@ -69,14 +52,9 @@ class StyleTransformer:
         original_text = text
         reason_tags = []
         
-        # 1. T5-small Translation (Syntax/Style Level)
-        modified_text = self._apply_t5_transformation(text, tone)
-        if modified_text != text:
-             reason_tags.append({
-                 "tag": f"{tone.upper()} TONE",
-                 "detail": f"Rewrote structure to sound more {tone} using T5.",
-                 "type": "structure"
-             })
+        # 1. Syntax/style changes are delegated to the Groq-powered ai_tone handler.
+        # This transformer focuses purely on rule-based vocabulary replacement (dictionary level).
+        modified_text = text
         
         # 2. Rule-based Vocabulary Replacement (Dictionary Level)
         final_text, vocab_tags = self._apply_rule_based_swaps(modified_text, tone)
@@ -97,28 +75,7 @@ class StyleTransformer:
             "reason_tags": reason_tags
         }
 
-    def _apply_t5_transformation(self, text: str, tone: str) -> str:
-        if not self.model:
-            return text
-            
-        # T5-small prompts perform best with explicit translation-style commands
-        # Although T5-small isn't perfectly instruction-tuned for "casual/formal" out-of-the-box like larger models, 
-        # using translation phrasing often yields altered syntactical results.
-        prompt = f"translate English to {tone} English: {text}"
-        
-        try:
-             # Run inference
-             result = self.model(prompt, max_length=len(text) + 50, num_return_sequences=1)
-             generated_text = result[0]['generated_text'].strip()
-             
-             # Sub-optimal edge cases with small models: Sometimes they output the prompt back or fail to change it.
-             # Only return if it actually produced something sensible
-             if generated_text and len(generated_text) > 5:
-                  return generated_text
-        except Exception as e:
-             logger.error(f"T5 generation failed: {e}")
-             
-        return text
+
 
     def _apply_rule_based_swaps(self, text: str, tone: str) -> Tuple[str, List]:
         if not self.nlp:

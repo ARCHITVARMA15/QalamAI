@@ -4,7 +4,7 @@
 export type CommitType =
   | "write" | "rewrite" | "describe" | "brainstorm"
   | "enhance" | "tone" | "manual" | "upload"
-  | "create" | "rename" | "insight";
+  | "create" | "rename" | "insight" | "tweak-plot";
 
 export interface Commit {
   id: string;
@@ -151,7 +151,8 @@ export const COMMIT_META: Record<CommitType, { label: string; color: string; bg:
   upload:     { label: "Upload",     color: "#3bc96a", bg: "rgba(59,201,106,0.12)"  },
   create:     { label: "Create",     color: "#1a7a5e", bg: "rgba(26,122,94,0.15)"   },
   rename:     { label: "Rename",     color: "#9e9589", bg: "rgba(158,149,137,0.12)" },
-  insight:    { label: "Insight",    color: "#c98c50", bg: "rgba(201,140,80,0.12)"  },
+  insight:      { label: "Insight",      color: "#c98c50", bg: "rgba(201,140,80,0.12)"  },
+  "tweak-plot":  { label: "Tweak Plot",   color: "#b84fc9", bg: "rgba(184,79,201,0.12)" },
 };
 
 export function formatTimeAgo(ts: number): string {

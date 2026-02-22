@@ -13,9 +13,15 @@ interface Props {
   comicImage: { image_base64: string; prompt_used: string; source_text: string } | null;
   comicLoading: boolean;
   onClearComic: () => void;
+  // Writing Mode: the parent controls polling; sidebar surfaces the toggle
+  writingMode: boolean;
+  onWritingModeChange: (enabled: boolean) => void;
+  // Auto-suggest results from the parent's polling loop
+  writingSuggestions: string[];
+  onClearWritingSuggestions: () => void;
 }
 
-function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearResult, comicImage, comicLoading, onClearComic }: Props) {
+function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearResult, comicImage, comicLoading, onClearComic, writingMode, onWritingModeChange, writingSuggestions, onClearWritingSuggestions }: Props) {
   const [activeTab, setActiveTab] = useState<"chat" | "history">("chat");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -74,6 +80,38 @@ function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearRes
           ))}
         </div>
         <div style={{ display: "flex", gap: "0.25rem" }}>
+          {/* Writing Mode toggle — enables proactive auto-suggest scanning */}
+          <button
+            onClick={() => onWritingModeChange(!writingMode)}
+            title={writingMode ? "Writing Mode ON — click to disable" : "Enable Writing Mode for proactive suggestions"}
+            style={{
+              display: "flex", alignItems: "center", gap: "0.35rem",
+              padding: "0.2rem 0.6rem", borderRadius: "20px",
+              border: "1.5px solid",
+              borderColor: writingMode ? "#047857" : "#e8e2d9",
+              background: writingMode ? "rgba(4,120,87,0.08)" : "transparent",
+              color: writingMode ? "#047857" : "#9e9589",
+              fontFamily: "'DM Sans', sans-serif", fontSize: "0.72rem", fontWeight: 600,
+              cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap",
+            }}
+          >
+            {/* Toggle pill */}
+            <span style={{
+              display: "inline-block", width: "28px", height: "14px",
+              borderRadius: "7px", position: "relative",
+              background: writingMode ? "#047857" : "#d4cdc5",
+              transition: "background 0.2s",
+              flexShrink: 0,
+            }}>
+              <span style={{
+                position: "absolute", top: "2px",
+                left: writingMode ? "16px" : "2px",
+                width: "10px", height: "10px", borderRadius: "50%",
+                background: "#fff", transition: "left 0.2s",
+              }} />
+            </span>
+            Writing Mode
+          </button>
           <button style={tabIconBtn} title="New chat" onClick={() => setMessages([])}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -180,7 +218,57 @@ function RightSidebar({ projectId, scriptId, editorContent, aiResult, onClearRes
       {activeTab === "chat" && (
         <>
           <div style={{ flex: 1, overflowY: "auto", padding: "0.75rem" }}>
-            {messages.length === 0 && !aiResult && (
+            {/* Writing Mode active indicator + suggestions */}
+            {writingMode && (
+              <div style={{
+                marginBottom: "0.75rem",
+                borderRadius: "10px",
+                border: "1.5px solid #047857",
+                background: "rgba(4,120,87,0.04)",
+                overflow: "hidden",
+              }}>
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "0.5rem 0.75rem",
+                  borderBottom: writingSuggestions.length > 0 ? "1px solid rgba(4,120,87,0.15)" : "none",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#047857", display: "inline-block", animation: "pulse 2s ease infinite" }} />
+                    <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "#047857", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                      Writing Mode Active
+                    </span>
+                  </div>
+                  {writingSuggestions.length > 0 && (
+                    <button onClick={onClearWritingSuggestions} style={{ ...tabIconBtn, color: "#9e9589", width: "20px", height: "20px" }}>✕</button>
+                  )}
+                </div>
+                {writingSuggestions.length > 0 ? (
+                  <div style={{ padding: "0.5rem 0.75rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                    <p style={{ fontSize: "0.68rem", color: "#9e9589", marginBottom: "0.25rem" }}>
+                      Proactive suggestions based on your recent writing:
+                    </p>
+                    {writingSuggestions.map((s, i) => (
+                      <div key={i} style={{
+                        padding: "0.5rem 0.65rem", borderRadius: "8px",
+                        background: "#fff", border: "1px solid rgba(4,120,87,0.2)",
+                        fontSize: "0.79rem", color: "#1a1510", lineHeight: 1.5,
+                      }}>
+                        <span style={{ fontSize: "0.68rem", color: "#047857", fontWeight: 600, marginRight: "0.3rem" }}>
+                          💡
+                        </span>
+                        {s}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: "0.75rem", color: "#9e9589", padding: "0.5rem 0.75rem", fontStyle: "italic" }}>
+                    Scanning your recent writing for continuity suggestions…
+                  </p>
+                )}
+              </div>
+            )}
+
+            {messages.length === 0 && !aiResult && !writingMode && (
               <div style={{ textAlign: "center", padding: "3rem 1rem", color: "#9e9589" }}>
                 <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>💬</div>
                 <p style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1rem", color: "#1a1510", marginBottom: "0.4rem" }}>Start a conversation</p>

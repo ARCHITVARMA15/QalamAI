@@ -80,7 +80,7 @@ An intelligent writing assistant for screenwriters and long-form content creator
 - **Frontend** (`frontend/`): React 18 + TypeScript + Vite + Tailwind CSS
 - **Knowledge Graph Engine** (`services/knowledge_graph.py`): spaCy NER + NetworkX story bible
 - **Contradiction Detector** (`services/contradiction_detector.py`): Rule-based consistency checker
-- **Style Transformer** (`services/style_transformer.py`): Rule-based + local T5-small style transfer
+- **Style Transformer** (`services/style_transformer.py`): Rule-based style transfer
 - **NLP Pipeline** (`services/nlp_pipeline.py`): Readability, pacing, grammar analysis
 - **Collaboration Layer** (`services/collab_manager.py`): WebSocket + Yjs CRDT real-time editing
 - **Multilingual Support** (`services/multilingual.py`): Hindi/Marathi NLP processing
@@ -93,7 +93,7 @@ An intelligent writing assistant for screenwriters and long-form content creator
 ### Service Design Rules
 
 - Each service must be independent and individually testable
-- Use dependency injection for external clients (T5-small, LanguageTool)
+- Use dependency injection for external clients (LanguageTool)
 - Implement fallback mechanisms for model failures (rule-based always runs)
 - Keep any API keys in environment variables, never hardcode
 - Core logic (NER, graph, contradiction rules) must never call external APIs
@@ -109,7 +109,7 @@ An intelligent writing assistant for screenwriters and long-form content creator
 - `data/file_parser.py` — PDF/Word/TXT text extraction, metadata cleaning, story splitting
 - `knowledge_graph.py` — spaCy NER + NetworkX story bible construction
 - `contradiction_detector.py` — Rule-based consistency and logic checker
-- `style_transformer.py` — Vocabulary rules + local T5-small style transfer
+- `style_transformer.py` — Vocabulary rules style transfer
 - `nlp_pipeline.py` — Readability, pacing, grammar, coreference analysis
 - `collab_manager.py` — WebSocket real-time collaboration manager
 - `App.tsx` — Main React editor component
@@ -121,7 +121,7 @@ An intelligent writing assistant for screenwriters and long-form content creator
 | DocumentParser        | `data/file_parser.py`       | Extract text from PDF/DOCX, clean metadata, split stories |
 | KnowledgeGraphEngine  | `knowledge_graph.py`        | spaCy NER + NetworkX story bible               |
 | ContradictionDetector | `contradiction_detector.py` | Rule-based fact conflict detection             |
-| StyleTransformer      | `style_transformer.py`      | Rule-based vocab swap + local T5-small rewrite |
+| StyleTransformer      | `style_transformer.py`      | Rule-based vocab swap                          |
 | NLPPipeline           | `nlp_pipeline.py`           | Readability, pacing, grammar, coreference      |
 | CollabManager         | `collab_manager.py`         | WebSocket + CRDT real-time co-editing          |
 | MultilingualProcessor | `multilingual.py`           | Cross-language NLP (English, Hindi, Marathi)   |
@@ -163,15 +163,15 @@ An intelligent writing assistant for screenwriters and long-form content creator
 | Grammar checking             | LanguageTool (local) | ❌ No               |
 | Coreference resolution       | spaCy neuralcoref    | ❌ No               |
 | Vocabulary-level style swap  | Dictionary rules     | ❌ No               |
-| Syntax-level style rewrite   | T5-small (local)     | ✅ Yes (documented) |
+| Syntax-level style rewrite   | Groq / External API  | ✅ Yes (documented) |
 
-**Total: ~80% custom pipelines, ~20% local T5-small. Zero cloud LLM API calls in core logic.**
+**Total: ~80% custom pipelines, ~20% external API. Zero cloud LLM API calls in core NLP logic.**
 
 ### Anti-Patterns
 
 - ❌ Calling external LLM APIs for core NLP logic → ✅ Use spaCy + rule-based pipelines
 - ❌ Generic exception catching → ✅ Specific exceptions with context
-- ❌ No fallback when T5-small fails → ✅ Rule-based transform always available as fallback
+- ❌ No fallback when external API fails → ✅ Rule-based transform always available as fallback
 - ❌ Blocking synchronous NLP calls → ✅ Use async + background tasks for heavy processing
 - ❌ Missing CORS configuration → ✅ Configure allowed origins in settings
 - ❌ Hardcode model paths → ✅ Load from `.env` via settings

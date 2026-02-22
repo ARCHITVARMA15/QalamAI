@@ -7,10 +7,10 @@ from config.db import get_database
 from services.knowledge_graph import KnowledgeGraphEngine
 from services.contradiction_detector import ContradictionDetector
 from services.persona_generator import PersonaGenerator
-# from services.style_transformer import StyleTransformer  # Disabled — T5-small crashes on startup
+# from services.style_transformer import StyleTransformer
 from services.enhancement_service import EnhancementService
 from ai.groq_service import generate_chat_reply
-from ai.writing_tools import handle_ai_action
+from ai.writing_tools import handle_ai_action, ai_tweak_plot, ai_auto_suggest
 from ai.fact_checker import fact_check_with_rag
 
 router = APIRouter()
@@ -20,7 +20,7 @@ try:
     kg_engine = KnowledgeGraphEngine()
     detector = ContradictionDetector()
     persona_gen = PersonaGenerator()
-    # style_transformer = StyleTransformer()  # Disabled — T5-small crashes on startup
+    # style_transformer = StyleTransformer()
     enhancement_service = EnhancementService()
 except Exception as e:
     print(f"Error loading NLP engines: {e}")
@@ -44,6 +44,15 @@ class ChatRequest(BaseModel):
     scriptId: str = ""
     context: str = ""
     mode: str = "Standard"
+
+class TweakPlotRequest(BaseModel):
+    script_id: str
+    original_text: str
+    tweak_instruction: str
+
+class AutoSuggestRequest(BaseModel):
+    script_id: str
+    recent_text: str  # Last ~500 words the user has typed
 
 @router.post("/scripts/{script_id}/analyze")
 async def analyze_script(script_id: str, request: AnalyzeRequest):
@@ -184,7 +193,7 @@ async def enhance_content(request: AIActionRequest):
         ]
     }
 
-# Tone transformation — routed through Groq (T5-small is disabled)
+# Tone transformation — routed through Groq
 @router.post("/transform-style")
 async def transform_style(request: AIActionRequest):
     result = await handle_ai_action("tone", request.content, tone=request.tone)
@@ -206,6 +215,67 @@ async def ai_action_endpoint(request: AIActionRequest):
         genre=request.genre,
     )
     return result
+
+# ── Plot Tweak — retroactive story change grounded in the Knowledge Graph ────
+@router.post("/analysis/tweak-plot")
+async def tweak_plot(request: TweakPlotRequest):
+    """
+    Rewrite a passage to incorporate a retroactive plot change.
+    Uses the KG story bible to avoid introducing new contradictions.
+    Returns the rewritten text, change metadata, and any contradiction warnings.
+    """
+    try:
+        result = await ai_tweak_plot(
+            content=request.original_text,
+            instruction=request.tweak_instruction,
+            script_id=request.script_id,
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Writing Mode — proactive consistency suggestions ──────────────────────────
+@router.post("/analysis/auto-suggest-tweaks")
+async def auto_suggest_tweaks(request: AutoSuggestRequest):
+    """
+    Proactively scan the writer's recent output against the Knowledge Graph.
+    Returns up to 4 specific suggestions (potential contradictions, continuity
+    opportunities, timeline gaps) to surface while the user is still writing.
+    """
+    db = get_database()
+
+    # Build story bible summary to pass as grounding context to Groq
+    story_bible_summary = ""
+    if request.script_id:
+        bible = await db["story_bibles"].find_one({"script_id": request.script_id})
+        if bible:
+            nodes = bible.get("nodes", [])
+            links = bible.get("links", [])
+
+            node_lines = [
+                f"- {n.get('type', 'Entity')}: {n['id']}"
+                for n in nodes[:40]
+            ]
+            link_lines = [
+                f"- {l['source']} [{l.get('relation', 'related to')}] {l['target']}"
+                for l in links[:60]
+            ]
+
+            if node_lines:
+                story_bible_summary += "Entities:\n" + "\n".join(node_lines) + "\n"
+            if link_lines:
+                story_bible_summary += "Relationships:\n" + "\n".join(link_lines)
+
+    try:
+        result = await ai_auto_suggest(
+            recent_text=request.recent_text,
+            story_bible_summary=story_bible_summary,
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/chat")
 async def chat_interaction(request: ChatRequest):

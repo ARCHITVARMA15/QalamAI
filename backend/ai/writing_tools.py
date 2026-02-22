@@ -210,8 +210,9 @@ async def ai_brainstorm(content: str, context: str = "", genre: str = "") -> dic
 
 async def ai_tone(content: str, tone: str = "formal", context: str = "", genre: str = "") -> dict:
     """
-    Transform the writing style/tone of the given text.
-    Replaces the broken T5-small style transformer with Groq.
+    Transform the writing style/tone of the given text using Groq.
+    Routes all tone changes through the LLM (rule-based vocab swaps are handled
+    by StyleTransformer; this covers syntactic-level transformation).
     Also asks the model to report specific vocabulary swaps for transparency.
     """
     system = BASE_SYSTEM + (
@@ -346,10 +347,146 @@ async def ai_summarize(content: str, context: str = "", genre: str = "") -> dict
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Dispatcher — routes action string to the correct handler
+# Plot Tweaking — retroactive story change with KG grounding
 # ═════════════════════════════════════════════════════════════════════════════
 
-# Map action names to their handler functions
+async def ai_tweak_plot(content: str, instruction: str, script_id: str) -> dict:
+    """
+    Retroactively rewrite a passage to apply a specific plot change.
+    Grounds the rewrite against the Knowledge Graph so new text doesn't
+    break facts already established elsewhere in the story.
+
+    Steps:
+    1. Extract entities from the instruction to target relevant KG nodes.
+    2. Retrieve the matching subgraph from story_bibles via retrieve_facts_from_graph.
+    3. Feed original text + instruction + KG facts to Groq for the rewrite.
+    4. Run fact_check_with_rag on the output to surface any subtle contradictions.
+    """
+    # Local import avoids any top-level circular dependency
+    from ai.fact_checker import extract_query_entities, retrieve_facts_from_graph, fact_check_with_rag
+
+    # 1 — Extract entities from the instruction + content to find relevant KG nodes
+    query_text = instruction + " " + content[:500]
+    query_entities = extract_query_entities(query_text)
+
+    # 2 — Retrieve matching subgraph; degrades gracefully if no bible exists
+    graph_facts: dict = {"nodes": [], "links": []}
+    if script_id and script_id != "draft":
+        graph_facts = await retrieve_facts_from_graph(script_id, query_entities)
+
+    # 3 — Format KG facts into a readable list for the system prompt
+    facts_lines: list[str] = []
+    for node in graph_facts.get("nodes", [])[:20]:
+        scenes = ", ".join(node.get("mentions", [])[:3])
+        facts_lines.append(f"- {node.get('type', 'Entity')}: {node['id']} (scenes: {scenes or 'unknown'})")
+    for link in graph_facts.get("links", [])[:30]:
+        rel = link.get("relation", "related to")
+        facts_lines.append(f"- {link['source']} [{rel}] {link['target']}")
+
+    facts_block = "\n".join(facts_lines)
+
+    # 4 — Build Groq prompt; ground rewrite in established story facts
+    system = BASE_SYSTEM + (
+        "TASK: Rewrite the given passage to incorporate a specific retroactive plot change. "
+        "Apply the change naturally — do NOT break any established story facts listed below. "
+        "Keep the same prose style and character voices. "
+        "Return ONLY the rewritten passage.\n"
+    )
+    if facts_block:
+        system += f"\nEstablished story facts (must not be contradicted):\n{facts_block}\n"
+
+    user_msg = (
+        f"Original passage:\n\n{content}\n\n"
+        f"Plot change to apply: {instruction}"
+    )
+
+    rewritten = await _call_groq(system, user_msg, temperature=0.6, max_tokens=1500)
+
+    # 5 — Fact-check the new text to catch subtle contradictions introduced by the rewrite
+    contradiction_warnings: list[str] = []
+    if script_id and script_id != "draft":
+        check_reply = await fact_check_with_rag(
+            user_message=rewritten,
+            script_id=script_id,
+            editor_content=content,
+            conversation_history=[],
+            programmatic_flags=[],
+        )
+        # Only surface the warning if the checker actually flagged a real issue
+        if any(kw in check_reply.lower() for kw in ("contradict", "conflict", "inconsisten", "mismatch")):
+            contradiction_warnings.append(check_reply)
+
+    original_words = _word_count(content)
+    rewritten_words = _word_count(rewritten)
+
+    return {
+        "result": rewritten,
+        "warnings": contradiction_warnings,
+        "changes": [
+            {
+                "type": "structure",
+                "description": f"Applied retroactive plot change: \"{instruction[:80]}{'…' if len(instruction) > 80 else ''}\"",
+            },
+            {
+                "type": "consistency",
+                "description": (
+                    f"Rewrote {original_words} → {rewritten_words} words using "
+                    f"{len(graph_facts.get('nodes', []))} KG nodes as grounding context"
+                ),
+            },
+        ],
+    }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Writing Mode — proactive plot-consistency suggestions
+# ═════════════════════════════════════════════════════════════════════════════
+
+async def ai_auto_suggest(recent_text: str, story_bible_summary: str) -> dict:
+    """
+    Proactively scan a writer's recent output against the Knowledge Graph and
+    return actionable "Suggested Tweaks" — e.g. potential contradictions or
+    continuity opportunities the writer might not have noticed yet.
+
+    Returns a list of short, specific suggestion strings.
+    """
+    system = (
+        "You are Kalam AI — a continuity analyst for screenwriters. "
+        "Given a story bible summary and a recent passage of new writing, "
+        "identify up to 4 proactive suggestions the writer should consider. "
+        "Focus on: potential contradictions with the story bible, "
+        "opportunities to reference established facts, "
+        "logic gaps, or timeline inconsistencies. "
+        "Be specific — mention character names, facts, or events by name. "
+        "Return your response as a JSON array of suggestion strings. Example:\n"
+        '[\"Suggestion 1.\", \"Suggestion 2.\"]\n'
+        "Return ONLY the JSON array — no other text.\n"
+    )
+
+    user_msg = ""
+    if story_bible_summary:
+        user_msg += f"Story Bible Context:\n{story_bible_summary}\n\n"
+    user_msg += f"Recent writing (last ~500 words):\n\n{recent_text[-2500:]}"
+
+    raw = await _call_groq(system, user_msg, temperature=0.4, max_tokens=600)
+
+    # Reuse the brainstorm suggestion parser — same JSON array format
+    suggestions = _parse_suggestions(raw)
+
+    return {
+        "suggestions": suggestions[:4],  # Cap at 4 proactive suggestions
+        "changes": [
+            {
+                "type": "consistency",
+                "description": f"Scanned {_word_count(recent_text)} words of recent writing against story bible",
+            }
+        ],
+    }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Dispatcher — routes action string to the correct handler
+# ═════════════════════════════════════════════════════════════════════════════
 _ACTION_MAP = {
     "write": ai_write,
     "rewrite": ai_rewrite,

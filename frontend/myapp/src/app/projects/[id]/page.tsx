@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { callAIAction, saveProject, UploadResponse, generateComicImage, ComicResult } from "@/lib/api";
+import { callAIAction, saveProject, UploadResponse, generateComicImage, ComicResult, tweakPlot, autoSuggestTweaks } from "@/lib/api";
 import { recordCommit, CommitType } from "@/lib/commits";
 import LeftSidebar from "@/components/editor/LeftSidebar";
 import RightSidebar from "@/components/editor/RightSidebar";
@@ -48,6 +48,7 @@ function getCommitMessage(action: string, selectedText?: string): string {
     summarize: "Summarized section",
     upload: "Uploaded file and extracted content",
     insight: "Ran knowledge graph analysis",
+    "tweak-plot": `Retroactive plot tweak${preview}`,
   };
   return map[action] || `Applied ${action}`;
 }
@@ -74,11 +75,57 @@ export default function ProjectEditorPage() {
   const [activeChapterId, setActiveChapterId] = useState("ch-1");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Search state
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchMatches, setSearchMatches] = useState<HTMLElement[]>([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+
   // Comic generation state
   const [comicImage, setComicImage] = useState<ComicResult | null>(null);
   const [comicLoading, setComicLoading] = useState(false);
 
-  // ─── Commit tracking refs ────────────────────────────────────────────────────
+  // Writing Mode state — powers auto-suggest-tweaks polling
+  const [writingMode, setWritingMode] = useState(false);
+  const [writingSuggestions, setWritingSuggestions] = useState<string[]>([]);
+  const writingModePollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Ref mirror of activeScriptId so acceptDiff closures always read the latest value
+  const activeScriptIdRef = useRef<string | null>(null);
+  useEffect(() => { activeScriptIdRef.current = activeScriptId; }, [activeScriptId]);
+
+  // ─── Writing Mode polling ─────────────────────────────────────────────────
+  // When Writing Mode is ON, every 30s send the latest ~500 words to the
+  // auto-suggest-tweaks endpoint and surface any continuity suggestions.
+  useEffect(() => {
+    if (!writingMode || !activeScriptId) {
+      // Clear any running poller when mode is turned off
+      if (writingModePollerRef.current) clearInterval(writingModePollerRef.current);
+      return;
+    }
+
+    const poll = async () => {
+      const text = editorRef.current?.innerText || "";
+      const recentText = text.split(/\s+/).slice(-500).join(" ");
+      if (recentText.trim().length < 30) return; // Not enough content yet
+      try {
+        const res = await autoSuggestTweaks(activeScriptId, recentText);
+        if (res.suggestions && res.suggestions.length > 0) {
+          setWritingSuggestions(res.suggestions);
+        }
+      } catch (err) {
+        console.error("Writing Mode auto-suggest failed:", err);
+      }
+    };
+
+    poll(); // First call immediately
+    writingModePollerRef.current = setInterval(poll, 30_000);
+
+    // Cleanup on disable or re-run
+    return () => {
+      if (writingModePollerRef.current) clearInterval(writingModePollerRef.current);
+    };
+  }, [writingMode, activeScriptId]);
+
   const lastCommittedWords = useRef(0);
   const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasRecordedCreate = useRef(false);
@@ -336,7 +383,9 @@ export default function ProjectEditorPage() {
     setIsSaved(false);
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
-      const content = editorRef.current?.innerHTML || "";
+      let content = editorRef.current?.innerHTML || "";
+      // Strip search highlights before saving (just in case any were left over from before)
+      content = content.replace(/<mark class="search-highlight"[^>]*>([\s\S]*?)<\/mark>/gi, "$1");
       const wc = countWords();
       await saveProject(activeScriptId, content, wc);
       setIsSaved(true);
@@ -378,6 +427,135 @@ export default function ProjectEditorPage() {
   const handleUndo = () => { document.execCommand("undo"); editorRef.current?.focus(); };
   const handleRedo = () => { document.execCommand("redo"); editorRef.current?.focus(); };
 
+  // ─── Search Functionality (Text Node Based) ──────────────────────────────────
+  const handleSearchToggle = () => {
+    setShowSearch(s => !s);
+    if (showSearch) {
+      clearSearchHighlights();
+    } else {
+      setTimeout(() => document.getElementById("search-input")?.focus(), 50);
+    }
+  };
+
+  const clearSearchHighlights = () => {
+    if (!editorRef.current) return;
+    const marks = editorRef.current.querySelectorAll("mark.search-highlight");
+    marks.forEach(mark => {
+      const parent = mark.parentNode;
+      if (parent) {
+        parent.replaceChild(document.createTextNode(mark.textContent || ""), mark);
+        parent.normalize(); // merge adjacent text nodes
+      }
+    });
+    setSearchMatches([]);
+    setCurrentMatchIndex(-1);
+  };
+
+  const applySearchHighlights = () => {
+    clearSearchHighlights();
+    if (!searchQuery.trim() || searchQuery.trim().length < 2 || !editorRef.current) return;
+
+    const query = searchQuery.trim().toLowerCase();
+    const treeWalker = document.createTreeWalker(editorRef.current, NodeFilter.SHOW_TEXT, null);
+    const textNodes: Text[] = [];
+
+    // First, collect all text nodes
+    let node;
+    while ((node = treeWalker.nextNode())) {
+      textNodes.push(node as Text);
+    }
+
+    const newMatches: HTMLElement[] = [];
+
+    textNodes.forEach(textNode => {
+      let text = textNode.nodeValue || "";
+      let index = text.toLowerCase().indexOf(query);
+
+      while (index !== -1 && textNode.parentNode) {
+        // Split text node into three parts: before, match, after
+        const matchNode = textNode.splitText(index);
+        matchNode.splitText(query.length); // The rest of the text becomes a new sibling
+
+        // Wrap the match in a <mark>
+        const mark = document.createElement("mark");
+        mark.className = "search-highlight";
+        mark.style.backgroundColor = "#fff3cd"; // Using the user's custom highlight color look
+        mark.style.color = "inherit";
+        mark.style.padding = "2px 0";
+        mark.style.borderRadius = "3px";
+        mark.textContent = matchNode.nodeValue;
+
+        if (matchNode.parentNode) {
+          matchNode.parentNode.replaceChild(mark, matchNode);
+          newMatches.push(mark);
+        }
+
+        // Move to the next chunk of text
+        textNode = mark.nextSibling as Text;
+        if (!textNode || textNode.nodeType !== Node.TEXT_NODE) break;
+        text = textNode.nodeValue || "";
+        index = text.toLowerCase().indexOf(query);
+      }
+    });
+
+    setSearchMatches(newMatches);
+    if (newMatches.length > 0) {
+      setCurrentMatchIndex(0);
+      focusMatch(0, newMatches);
+    } else {
+      setCurrentMatchIndex(-1);
+    }
+  };
+
+  const focusMatch = (index: number, matches: HTMLElement[] = searchMatches) => {
+    if (matches.length === 0 || index < 0 || index >= matches.length) return;
+
+    // Reset old focus styles
+    matches.forEach(m => {
+      m.style.backgroundColor = "#fff3cd";
+      m.style.outline = "none";
+    });
+
+    // Set active focus style
+    const active = matches[index];
+    active.style.backgroundColor = "#fef08a";
+    active.style.outline = "2px solid #047857";
+
+    active.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const handleSearchNext = () => {
+    if (searchMatches.length === 0) return applySearchHighlights();
+
+    const nextIdx = (currentMatchIndex + 1) % searchMatches.length;
+    setCurrentMatchIndex(nextIdx);
+    focusMatch(nextIdx);
+  };
+
+  const handleSearchPrev = () => {
+    if (searchMatches.length === 0) return;
+
+    const prevIdx = currentMatchIndex - 1 < 0 ? searchMatches.length - 1 : currentMatchIndex - 1;
+    setCurrentMatchIndex(prevIdx);
+    focusMatch(prevIdx);
+  };
+
+  // Trigger search reliably when query finishes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (showSearch) applySearchHighlights();
+    }, 400); // debounce
+    return () => clearTimeout(timer);
+  }, [searchQuery, showSearch]);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.shiftKey ? handleSearchPrev() : handleSearchNext();
+    }
+    if (e.key === "Escape") handleSearchToggle();
+  };
+
   // ─── Keyboard shortcuts ──────────────────────────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey) {
@@ -387,19 +565,20 @@ export default function ProjectEditorPage() {
         case "u": e.preventDefault(); handleFormat("underline"); break;
         case "z": e.preventDefault(); e.shiftKey ? handleRedo() : handleUndo(); break;
         case "s": e.preventDefault(); triggerSave(); break;
+        case "f": e.preventDefault(); handleSearchToggle(); break;
       }
     }
   };
 
   // ─── AI Actions ──────────────────────────────────────────────────────────────
-  const handleAIAction = useCallback(async (action: string, options?: { tone?: string }) => {
+  const handleAIAction = useCallback(async (action: string, options?: { tone?: string; instructions?: string }) => {
     if (!project) return;
     setAiLoading(true);
     setAiResult(null);
 
     const selection = window.getSelection()?.toString() || "";
 
-    // Handle comic generation separately — it has its own loading state and display
+    // ── Comic generation — own loading state ────────────────────────────────
     if (action === "comic") {
       setAiLoading(false);
       if (!selection.trim()) return;
@@ -412,6 +591,78 @@ export default function ProjectEditorPage() {
         console.error("Comic generation failed:", err);
       } finally {
         setComicLoading(false);
+      }
+      return;
+    }
+
+    // ── Tweak Plot — retroactive story change with KG grounding ────────────
+    if (action === "tweak-plot") {
+      const instruction = options?.instructions?.trim();
+      if (!instruction) { setAiLoading(false); return; }
+
+      const fullContent = editorRef.current?.innerText || "";
+      const originalText = selection || fullContent.split("\n").filter(Boolean).slice(-3).join("\n");
+      const wordsBefore = fullContent.trim().split(/\s+/).filter(Boolean).length;
+
+      try {
+        const response = await tweakPlot(
+          activeScriptId || "draft",
+          originalText,
+          instruction,
+        );
+
+        // Inject the inline diff in the editor (same pattern as rewrite)
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0 && selection) {
+          const range = sel.getRangeAt(0);
+          const diffId = "diff-" + Date.now();
+          const diffNode = document.createElement("span");
+          diffNode.className = "inline-diff-container";
+          diffNode.contentEditable = "false";
+          diffNode.id = diffId;
+
+          // Build warning badge HTML if contradictions were flagged
+          const warningHtml = response.warnings && response.warnings.length > 0
+            ? `<span style="display:inline-block;background:#fff3cd;border:1px solid #ffc107;color:#856404;font-size:0.7em;padding:2px 6px;border-radius:4px;margin-left:4px;vertical-align:middle;" title="${response.warnings[0].replace(/"/g, "'").slice(0, 200)}">⚠️ Check continuity</span>`
+            : "";
+
+          diffNode.innerHTML = `
+            <span class="diff-del" style="background-color:#ffebe9;color:#cf222e;text-decoration:line-through;padding:0.2em;border-radius:3px;margin:0 0.1em;">${selection}</span>
+            <span class="diff-add" style="background-color:#dafbe1;color:#1a7f37;padding:0.2em;border-radius:3px;margin:0 0.1em;">${response.result}</span>
+            ${warningHtml}
+            <span class="diff-actions" style="display:inline-flex;gap:4px;vertical-align:middle;margin-left:6px;">
+              <button onclick="window.acceptDiff('${diffId}')" style="background:#2da44e;color:white;border:none;border-radius:4px;padding:2px 6px;font-size:0.7em;cursor:pointer;">✓ Accept</button>
+              <button onclick="window.rejectDiff('${diffId}')" style="background:#cf222e;color:white;border:none;border-radius:4px;padding:2px 6px;font-size:0.7em;cursor:pointer;">✕ Reject</button>
+            </span>
+          `;
+          range.deleteContents();
+          range.insertNode(diffNode);
+        }
+
+        // Record commit
+        const wordsAfter = editorRef.current?.innerText.trim().split(/\s+/).filter(Boolean).length || 0;
+        recordCommit({
+          projectId: project.id, projectTitle: project.title, projectEmoji: project.emoji || "📖",
+          type: "tweak-plot", message: getCommitMessage("tweak-plot", selection),
+          wordsBefore, wordsAfter, snippet: response.result?.slice(0, 120),
+        });
+        lastCommittedWords.current = wordsAfter;
+
+        setAiResult({
+          text: response.result,
+          changes: [
+            ...(response.changes || []),
+            // Surface any contradiction warnings as a special change entry
+            ...(response.warnings && response.warnings.length > 0
+              ? [{ type: "consistency", description: `⚠️ Contradiction warning: ${response.warnings[0].slice(0, 150)}` }]
+              : []
+            ),
+          ],
+        });
+      } catch (err) {
+        setAiResult({ text: "Plot tweak failed. Please try again." });
+      } finally {
+        setAiLoading(false);
       }
       return;
     }
@@ -445,6 +696,66 @@ export default function ProjectEditorPage() {
           editorRef.current!.innerHTML += `<p>${response.result}</p>`;
         }
         triggerSave();
+      } else if ((action === "rewrite" || action === "enhance" || action === "tone") && response.result && selection) {
+        // INLINE DIFF VIEWER LOGIC
+        // Instead of directly replacing or just showing in the sidebar, we inject an inline diff component approach
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          const diffId = "diff-" + Date.now();
+
+          // Create the diff container
+          const diffNode = document.createElement("span");
+          diffNode.className = "inline-diff-container";
+          diffNode.contentEditable = "false";
+          diffNode.id = diffId;
+
+          // The diff HTML looks like: [Deleted text in red strikethrough] [New text in green]
+          diffNode.innerHTML = `
+            <span class="diff-del" style="background-color: #ffebe9; color: #cf222e; text-decoration: line-through; padding: 0.2em; border-radius: 3px; margin: 0 0.1em;">${selection}</span>
+            <span class="diff-add" style="background-color: #dafbe1; color: #1a7f37; padding: 0.2em; border-radius: 3px; margin: 0 0.1em;">${response.result}</span>
+            <span class="diff-actions" style="display: inline-flex; gap: 4px; vertical-align: middle; margin-left: 6px;">
+              <button onclick="window.acceptDiff('${diffId}')" style="background: #2da44e; color: white; border: none; border-radius: 4px; padding: 2px 6px; font-size: 0.7em; cursor: pointer;">✓ Accept</button>
+              <button onclick="window.rejectDiff('${diffId}')" style="background: #cf222e; color: white; border: none; border-radius: 4px; padding: 2px 6px; font-size: 0.7em; cursor: pointer;">✕ Reject</button>
+            </span>
+          `;
+
+          range.deleteContents();
+          range.insertNode(diffNode);
+
+          // Register the global functions for the inline buttons if not already registered
+          if (!(window as any).acceptDiff) {
+            (window as any).acceptDiff = (id: string) => {
+              const node = document.getElementById(id);
+              if (node) {
+                const addedText = node.querySelector('.diff-add')?.textContent || '';
+                const textNode = document.createTextNode(addedText);
+                node.parentNode?.replaceChild(textNode, node);
+                // Trigger save after accepting so the document is persisted immediately
+                triggerSave();
+                // Re-analyse the full document to keep the Knowledge Graph in sync
+                const content = editorRef.current?.innerText || "";
+                // Use ref so this closure always reads the latest script ID
+                const scriptId = activeScriptIdRef.current;
+                if (scriptId && content.trim().length > 10) {
+                  fetch(`http://localhost:8000/api/scripts/${scriptId}/analyze`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text: content }),
+                  }).catch(err => console.error("KG re-analysis after accept failed:", err));
+                }
+              }
+            };
+            (window as any).rejectDiff = (id: string) => {
+              const node = document.getElementById(id);
+              if (node) {
+                const delText = node.querySelector('.diff-del')?.textContent || '';
+                const textNode = document.createTextNode(delText);
+                node.parentNode?.replaceChild(textNode, node);
+              }
+            };
+          }
+        }
       }
 
       // ── Record commit for this AI action ──────────────────────────────────
@@ -547,6 +858,9 @@ export default function ProjectEditorPage() {
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #d4cdc5; border-radius: 3px; }
+        
+        .inline-diff-container { display: inline; position: relative; }
+        .inline-diff-container .diff-actions button:hover { opacity: 0.85; transform: scale(1.05); }
       `}</style>
 
       {/* ── Top Navbar ── */}
@@ -677,10 +991,43 @@ export default function ProjectEditorPage() {
 
           <div ref={scrollContainerRef} style={{ flex: 1, overflowY: "auto", padding: "1.5rem 2rem" }}>
             <div style={{
-              background: "#fff", borderRadius: "16px",
+              background: "#fff", borderRadius: "16px", position: "relative",
               boxShadow: "0 2px 16px rgba(0,0,0,0.05), 0 1px 4px rgba(0,0,0,0.03)",
               padding: "2rem 2.5rem", minHeight: "calc(100% - 1rem)",
             }}>
+
+              {/* Floating Search Bar */}
+              {showSearch && (
+                <div style={{
+                  position: "absolute", top: "16px", right: "24px", zIndex: 10,
+                  display: "flex", alignItems: "center", background: "#fff", border: "1px solid #e8e2d9",
+                  borderRadius: "8px", padding: "4px 8px", boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                  animation: "fadeUp 0.2s ease"
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9e9589" strokeWidth="2" strokeLinecap="round" style={{ marginRight: 6 }}>
+                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    id="search-input"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={handleSearchKeyDown}
+                    placeholder="Find in document..."
+                    style={{ border: "none", outline: "none", width: "160px", fontSize: "0.85rem", color: "#1a1510", fontFamily: "'DM Sans', sans-serif" }}
+                  />
+                  {searchMatches.length > 0 && (
+                    <span style={{ fontSize: "0.75rem", color: "#9e9589", marginRight: "8px" }}>
+                      {currentMatchIndex + 1}/{searchMatches.length}
+                    </span>
+                  )}
+                  <div style={{ display: "flex", gap: "2px", borderLeft: "1px solid #e8e2d9", paddingLeft: "6px", marginLeft: "4px" }}>
+                    <button onClick={handleSearchPrev} title="Find Previous (Shift+Enter)" style={{ background: "none", border: "none", cursor: "pointer", color: "#4a4540", padding: "2px" }}>⬆</button>
+                    <button onClick={handleSearchNext} title="Find Next (Enter)" style={{ background: "none", border: "none", cursor: "pointer", color: "#4a4540", padding: "2px" }}>⬇</button>
+                    <button onClick={handleSearchToggle} title="Close (Esc)" style={{ background: "none", border: "none", cursor: "pointer", color: "#9e9589", padding: "2px", marginLeft: "4px" }}>✕</button>
+                  </div>
+                </div>
+              )}
+
               <input
                 value={docTitle}
                 onChange={e => setDocTitle(e.target.value)}
@@ -756,6 +1103,7 @@ export default function ProjectEditorPage() {
             onFormat={handleFormat}
             onUndo={handleUndo}
             onRedo={handleRedo}
+            onSearch={handleSearchToggle}
           />
         </main>
 
@@ -768,6 +1116,10 @@ export default function ProjectEditorPage() {
           comicImage={comicImage}
           comicLoading={comicLoading}
           onClearComic={() => setComicImage(null)}
+          writingMode={writingMode}
+          onWritingModeChange={setWritingMode}
+          writingSuggestions={writingSuggestions}
+          onClearWritingSuggestions={() => setWritingSuggestions([])}
         />
       </div>
     </>

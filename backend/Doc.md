@@ -28,7 +28,7 @@ Using the Story Bible as ground truth, every incoming sentence is parsed for fac
 
 ## Style & Tone Transformation
 
-A two-layer system handles style. Layer 1 is entirely rule-based — vocabulary substitution dictionaries, dependency-tree manipulation for active/passive conversion, and contraction handling. This covers 70% of transformation work with zero model calls. Layer 2 uses a locally fine-tuned **T5-small model** (no cloud APIs) for complex syntax restructuring. The transformation is controlled via an intensity slider (1–10), so users choose how aggressively the style shifts. A separate "Style Fingerprint" system lets users upload past work, extract their personal writing signature (sentence length distribution, lexical diversity, POS patterns), and apply it to new content.
+A two-layer system handles style. Layer 1 is entirely rule-based — vocabulary substitution dictionaries, dependency-tree manipulation for active/passive conversion, and contraction handling. Layer 2 uses an external API (like Groq) for complex syntax restructuring. The transformation is controlled via an intensity slider (1–10), so users choose how aggressively the style shifts. A separate "Style Fingerprint" system lets users upload past work, extract their personal writing signature (sentence length distribution, lexical diversity, POS patterns), and apply it to new content.
 
 ## Explainability Layer
 
@@ -44,9 +44,9 @@ A visual pacing panel shows word density per scene, dialogue vs. description rat
 
 ## Tech Stack
 
-* **Backend:** FastAPI, spaCy, NetworkX, T5-small (local), MongoDB, WebSocket
+* **Backend:** FastAPI, spaCy, NetworkX, MongoDB, WebSocket
 * **Frontend:** React + Tailwind CSS, D3.js (graph), CodeMirror (editor), Recharts (analytics)
-* **LLM Policy:** 80% custom pipelines, 20% local T5-small — fully documented
+* **LLM Policy:** Custom pipelines with minimal external API calls — fully documented
 
 ---
 

@@ -8,9 +8,10 @@ interface Props {
   onFormat: (command: string, value?: string) => void;
   onUndo: () => void;
   onRedo: () => void;
+  onSearch: () => void;
 }
 
-function EditorToolbar({ wordCount, isSaved, onFormat, onUndo, onRedo }: Props) {
+function EditorToolbar({ wordCount, isSaved, onFormat, onUndo, onRedo, onSearch }: Props) {
   const [fontSize, setFontSize] = useState("16");
   const [showFontMenu, setShowFontMenu] = useState(false);
 
@@ -121,6 +122,15 @@ function EditorToolbar({ wordCount, isSaved, onFormat, onUndo, onRedo }: Props) 
         <ToolBtn onClick={formatBtn("removeFormat")} title="Clear Formatting">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" /><circle cx="18" cy="18" r="3" />
+          </svg>
+        </ToolBtn>
+
+        <Divider />
+
+        {/* Search */}
+        <ToolBtn onClick={onSearch} title="Search in Document (⌘F)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
         </ToolBtn>
       </div>

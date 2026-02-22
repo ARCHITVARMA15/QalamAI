@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 interface Props {
   onAction: (action: string, options?: { tone?: string; instructions?: string }) => void;
@@ -9,9 +9,29 @@ interface Props {
 }
 
 const TONES = ["Dramatic", "Casual", "Formal", "Poetic", "Terse", "Whimsical"];
+
 function AIActionBar({ onAction, loading, hasSelection }: Props) {
   const [showToneMenu, setShowToneMenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  // Tweak Plot: inline panel for entering the change instruction
+  const [showTweakInput, setShowTweakInput] = useState(false);
+  const [tweakInstruction, setTweakInstruction] = useState("");
+  const tweakInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus the tweak input when panel opens
+  useEffect(() => {
+    if (showTweakInput) {
+      setTimeout(() => tweakInputRef.current?.focus(), 60);
+    }
+  }, [showTweakInput]);
+
+  const submitTweak = () => {
+    const instruction = tweakInstruction.trim();
+    if (!instruction) return;
+    onAction("tweak-plot", { instructions: instruction });
+    setTweakInstruction("");
+    setShowTweakInput(false);
+  };
 
   const primaryActions = [
     { id: "rewrite", label: "Rewrite", icon: "🔄", desc: "Rewrite selection", requiresSelection: true },
@@ -53,12 +73,87 @@ function AIActionBar({ onAction, loading, hasSelection }: Props) {
 
       <div style={{ width: "1px", height: "24px", background: "#e8e2d9", margin: "0 0.25rem" }} />
 
+      {/* Tweak Plot — retroactive story change with KG grounding */}
+      <div style={{ position: "relative" }}>
+        <ActionButton
+          label="Tweak Plot"
+          icon="✏️"
+          onClick={() => {
+            setShowTweakInput(v => !v);
+            setShowToneMenu(false);
+            setShowMoreMenu(false);
+          }}
+          disabled={loading}
+          loading={false}
+          active={showTweakInput}
+          tooltip="Retroactively change a plot point"
+        />
+        {showTweakInput && (
+          <div style={{
+            position: "absolute", top: "calc(100% + 8px)", left: 0,
+            background: "#fff", border: "1px solid #e8e2d9",
+            borderRadius: "12px", padding: "0.75rem",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 20,
+            minWidth: "280px", animation: "fadeUp 0.15s ease both",
+          }}>
+            <p style={{ fontSize: "0.72rem", color: "#9e9589", fontWeight: 600, marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              What do you want to change?
+            </p>
+            <input
+              ref={tweakInputRef}
+              value={tweakInstruction}
+              onChange={e => setTweakInstruction(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") submitTweak();
+                if (e.key === "Escape") { setShowTweakInput(false); setTweakInstruction(""); }
+              }}
+              placeholder="e.g. Change the murder weapon to a poisoned dart"
+              style={{
+                width: "100%", padding: "0.55rem 0.7rem",
+                border: "1.5px solid #e8e2d9", borderRadius: "8px",
+                fontFamily: "'DM Sans', sans-serif", fontSize: "0.82rem",
+                color: "#1a1510", outline: "none",
+                transition: "border-color 0.15s",
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = "#047857")}
+              onBlur={e => (e.currentTarget.style.borderColor = "#e8e2d9")}
+            />
+            <p style={{ fontSize: "0.68rem", color: "#b8b0a4", marginTop: "0.35rem", lineHeight: 1.4 }}>
+              {hasSelection ? "Will rewrite your selected text." : "Will rewrite the current paragraph."} Story Bible is used to avoid new contradictions.
+            </p>
+            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => { setShowTweakInput(false); setTweakInstruction(""); }}
+                style={{ padding: "0.35rem 0.7rem", borderRadius: "7px", border: "1px solid #e8e2d9", background: "transparent", color: "#9e9589", fontFamily: "'DM Sans', sans-serif", fontSize: "0.78rem", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitTweak}
+                disabled={!tweakInstruction.trim() || loading}
+                style={{
+                  padding: "0.35rem 0.85rem", borderRadius: "7px", border: "none",
+                  background: tweakInstruction.trim() ? "#047857" : "#e8e2d9",
+                  color: "#fff", fontFamily: "'DM Sans', sans-serif", fontSize: "0.78rem",
+                  cursor: tweakInstruction.trim() ? "pointer" : "default", fontWeight: 500,
+                  transition: "background 0.15s",
+                }}
+              >
+                Apply Tweak
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ width: "1px", height: "24px", background: "#e8e2d9", margin: "0 0.25rem" }} />
+
       {/* Tone button */}
       <div style={{ position: "relative" }}>
         <ActionButton
           label="Tone"
           icon="🎭"
-          onClick={() => { setShowToneMenu(!showToneMenu); setShowMoreMenu(false); }}
+          onClick={() => { setShowToneMenu(!showToneMenu); setShowMoreMenu(false); setShowTweakInput(false); }}
           disabled={loading}
           loading={false}
           active={showToneMenu}
@@ -101,7 +196,7 @@ function AIActionBar({ onAction, loading, hasSelection }: Props) {
         <ActionButton
           label="More Tools"
           icon="⚡"
-          onClick={() => { setShowMoreMenu(!showMoreMenu); setShowToneMenu(false); }}
+          onClick={() => { setShowMoreMenu(!showMoreMenu); setShowToneMenu(false); setShowTweakInput(false); }}
           disabled={loading}
           loading={false}
           active={showMoreMenu}
@@ -137,10 +232,10 @@ function AIActionBar({ onAction, loading, hasSelection }: Props) {
       </div>
 
       {/* Click outside to close menus */}
-      {(showToneMenu || showMoreMenu) && (
+      {(showToneMenu || showMoreMenu || showTweakInput) && (
         <div
           style={{ position: "fixed", inset: 0, zIndex: 10 }}
-          onClick={() => { setShowToneMenu(false); setShowMoreMenu(false); }}
+          onClick={() => { setShowToneMenu(false); setShowMoreMenu(false); setShowTweakInput(false); }}
         />
       )}
 
