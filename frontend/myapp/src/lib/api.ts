@@ -246,3 +246,119 @@ export async function autoSuggestTweaks(
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+// ─── Contradictions (continuity errors) ────────────────────────────────────────
+
+export interface Contradiction {
+  _id: string;
+  script_id: string;
+  sentence?: string;
+  conflict_with?: string;
+  reason_tag?: string;
+  resolved?: boolean;
+}
+
+/**
+ * GET /api/scripts/{script_id}/contradictions
+ * Fetches unresolved continuity errors for the script.
+ */
+export async function fetchContradictions(scriptId: string): Promise<Contradiction[]> {
+  const res = await fetch(`http://localhost:8000/api/scripts/${scriptId}/contradictions`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+/**
+ * PUT /api/contradictions/{contra_id}/resolve
+ * Marks a contradiction as resolved.
+ */
+export async function resolveContradiction(contraId: string): Promise<void> {
+  const res = await fetch(`http://localhost:8000/api/contradictions/${contraId}/resolve`, {
+    method: "PUT",
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// ─── Multi-Panel Comic Strip ───────────────────────────────────────────────
+
+export interface ComicPanel {
+  image_base64: string;
+  prompt_used: string;
+  source_text: string;
+  panel_number: number;
+  status: string;
+  message?: string;
+}
+
+export interface ComicStripResult {
+  status: "success" | "partial" | "error";
+  panels: ComicPanel[];
+  panel_count: number;
+  failed_panels: number;
+  message?: string;
+}
+
+/**
+ * POST /api/scripts/{scriptId}/generate-comic-strip
+ * Splits selected text into scenes and generates one comic image per scene.
+ */
+export async function generateComicStrip(
+  scriptId: string,
+  selectedText: string,
+  maxPanels: number = 6,
+): Promise<ComicStripResult> {
+  const res = await fetch(`http://localhost:8000/api/scripts/${scriptId}/generate-comic-strip`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ selected_text: selectedText, max_panels: maxPanels }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+/**
+ * POST /api/scripts/{scriptId}/comic-pdf
+ * Sends panels to the backend and returns a PDF blob for download.
+ */
+export async function downloadComicPdf(
+  scriptId: string,
+  panels: ComicPanel[],
+  title?: string,
+): Promise<Blob> {
+  const res = await fetch(`http://localhost:8000/api/scripts/${scriptId}/comic-pdf`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ panels, title }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.blob();
+}
+
+// ─── Orchestrate — Full Analysis Pipeline ──────────────────────────────────
+
+export interface OrchestrateResult {
+  issues: Contradiction[];
+  suggestions: string[];
+  kg_stats: { nodes: number; links: number };
+  contradictions_found: number;
+  error?: string;
+}
+
+/**
+ * POST /api/scripts/{scriptId}/orchestrate
+ * Runs the full analysis pipeline: KG build → contradiction detection → auto-suggestions.
+ * Called after the user's first AI interaction on a script.
+ */
+export async function orchestrateAnalysis(
+  scriptId: string,
+  text: string,
+  runSuggestions: boolean = true,
+): Promise<OrchestrateResult> {
+  const res = await fetch(`http://localhost:8000/api/scripts/${scriptId}/orchestrate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, run_suggestions: runSuggestions }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { callAIAction, saveProject, UploadResponse, generateComicImage, ComicResult, tweakPlot, autoSuggestTweaks } from "@/lib/api";
+import { callAIAction, saveProject, UploadResponse, generateComicImage, ComicResult, tweakPlot, fetchContradictions, resolveContradiction, Contradiction, generateComicStrip, downloadComicPdf, ComicPanel, orchestrateAnalysis } from "@/lib/api";
 import { recordCommit, CommitType } from "@/lib/commits";
 import LeftSidebar from "@/components/editor/LeftSidebar";
 import RightSidebar from "@/components/editor/RightSidebar";
@@ -85,46 +85,59 @@ export default function ProjectEditorPage() {
   const [comicImage, setComicImage] = useState<ComicResult | null>(null);
   const [comicLoading, setComicLoading] = useState(false);
 
-  // Writing Mode state — powers auto-suggest-tweaks polling
-  const [writingMode, setWritingMode] = useState(false);
-  const [writingSuggestions, setWritingSuggestions] = useState<string[]>([]);
-  const writingModePollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Comic STRIP modal state (multi-panel + PDF download)
+  const [comicPanels, setComicPanels] = useState<ComicPanel[]>([]);
+  const [comicStripLoading, setComicStripLoading] = useState(false);
+  const [showComicModal, setShowComicModal] = useState(false);
+
+  // Suggestions from orchestration pipeline
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  // Alert counts (set after orchestration, cleared when user views Issues/Suggestions tabs)
+  const [newIssueCount, setNewIssueCount] = useState(0);
+  const [newSuggestionCount, setNewSuggestionCount] = useState(0);
+
+  // Track whether we've already triggered orchestration after the first user query
+  const hasOrchestrated = useRef(false);
+
+  // Resizable sidebar
+  const [sidebarWidth, setSidebarWidth] = useState(420);
+  const isResizing = useRef(false);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isResizing.current) return;
+      // Sidebar is on the right; width = window.innerWidth - mouseX
+      const newWidth = Math.max(280, Math.min(700, window.innerWidth - e.clientX));
+      setSidebarWidth(newWidth);
+    };
+    const onMouseUp = () => { isResizing.current = false; document.body.style.cursor = ""; document.body.style.userSelect = ""; };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => { window.removeEventListener("mousemove", onMouseMove); window.removeEventListener("mouseup", onMouseUp); };
+  }, []);
+
+  // Contradictions (continuity errors) from backend — shown in RightSidebar Issues tab
+  const [contradictions, setContradictions] = useState<Contradiction[]>([]);
   // Ref mirror of activeScriptId so acceptDiff closures always read the latest value
   const activeScriptIdRef = useRef<string | null>(null);
   useEffect(() => { activeScriptIdRef.current = activeScriptId; }, [activeScriptId]);
 
-  // ─── Writing Mode polling ─────────────────────────────────────────────────
-  // When Writing Mode is ON, every 30s send the latest ~500 words to the
-  // auto-suggest-tweaks endpoint and surface any continuity suggestions.
-  useEffect(() => {
-    if (!writingMode || !activeScriptId) {
-      // Clear any running poller when mode is turned off
-      if (writingModePollerRef.current) clearInterval(writingModePollerRef.current);
-      return;
+  // Fetch contradictions when we have a script (and refetch when user requests)
+  const refreshContradictions = useCallback(async () => {
+    if (!activeScriptId) return;
+    try {
+      const list = await fetchContradictions(activeScriptId);
+      setContradictions(list);
+    } catch (e) {
+      console.error("Failed to fetch contradictions", e);
+      setContradictions([]);
     }
+  }, [activeScriptId]);
 
-    const poll = async () => {
-      const text = editorRef.current?.innerText || "";
-      const recentText = text.split(/\s+/).slice(-500).join(" ");
-      if (recentText.trim().length < 30) return; // Not enough content yet
-      try {
-        const res = await autoSuggestTweaks(activeScriptId, recentText);
-        if (res.suggestions && res.suggestions.length > 0) {
-          setWritingSuggestions(res.suggestions);
-        }
-      } catch (err) {
-        console.error("Writing Mode auto-suggest failed:", err);
-      }
-    };
-
-    poll(); // First call immediately
-    writingModePollerRef.current = setInterval(poll, 30_000);
-
-    // Cleanup on disable or re-run
-    return () => {
-      if (writingModePollerRef.current) clearInterval(writingModePollerRef.current);
-    };
-  }, [writingMode, activeScriptId]);
+  useEffect(() => {
+    if (activeScriptId) refreshContradictions();
+  }, [activeScriptId, refreshContradictions]);
 
   const lastCommittedWords = useRef(0);
   const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -393,6 +406,7 @@ export default function ProjectEditorPage() {
   }, [project, countWords, activeScriptId]);
 
   // ─── Editor input: auto-commit on 10+ word changes ──────────────────────────
+  // When Writing Mode is ON, also schedule reactive auto-suggest (debounced on change).
   const handleEditorInput = useCallback(() => {
     countWords();
     triggerSave();
@@ -417,7 +431,39 @@ export default function ProjectEditorPage() {
         lastCommittedWords.current = currentWords;
       }
     }, 4000);
+
   }, [project, countWords, triggerSave]);
+
+  // ─── Insert text from chat/LLM into editor (at cursor or at end) ─────────────
+  const insertTextIntoEditor = useCallback((text: string) => {
+    const editor = editorRef.current;
+    if (!editor || !text.trim()) return;
+    editor.focus();
+    const sel = window.getSelection();
+    const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    const isInEditor = range && editor.contains(range.commonAncestorContainer);
+
+    const textNode = document.createTextNode(text.trim());
+    if (isInEditor && range) {
+      range.deleteContents();
+      range.insertNode(textNode);
+      range.setStartAfter(textNode);
+      range.setEndAfter(textNode);
+    } else {
+      const endRange = document.createRange();
+      endRange.selectNodeContents(editor);
+      endRange.collapse(false);
+      endRange.insertNode(textNode);
+      endRange.setStartAfter(textNode);
+      endRange.setEndAfter(textNode);
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(endRange);
+      }
+    }
+    triggerSave();
+    countWords();
+  }, [triggerSave, countWords]);
 
   // ─── Formatting ──────────────────────────────────────────────────────────────
   const handleFormat = (command: string, value?: string) => {
@@ -578,19 +624,20 @@ export default function ProjectEditorPage() {
 
     const selection = window.getSelection()?.toString() || "";
 
-    // ── Comic generation — own loading state ────────────────────────────────
+    // ── Comic generation — uses multi-panel strip + modal ─────────────────
     if (action === "comic") {
       setAiLoading(false);
       if (!selection.trim()) return;
-      setComicLoading(true);
-      setComicImage(null);
+      setComicStripLoading(true);
+      setComicPanels([]);
+      setShowComicModal(true);
       try {
-        const result = await generateComicImage(activeScriptId || "draft", selection);
-        setComicImage(result);
+        const result = await generateComicStrip(activeScriptId || "draft", selection, 4);
+        if (result.panels) setComicPanels(result.panels);
       } catch (err) {
-        console.error("Comic generation failed:", err);
+        console.error("Comic strip generation failed:", err);
       } finally {
-        setComicLoading(false);
+        setComicStripLoading(false);
       }
       return;
     }
@@ -1137,21 +1184,191 @@ export default function ProjectEditorPage() {
           />
         </main>
 
+        {/* ── Resize Handle ── */}
+        <div
+          onMouseDown={() => {
+            isResizing.current = true;
+            document.body.style.cursor = "col-resize";
+            document.body.style.userSelect = "none";
+          }}
+          style={{
+            width: "5px", flexShrink: 0, cursor: "col-resize",
+            background: "transparent",
+            transition: "background 0.15s",
+            zIndex: 10,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "#047857"; }}
+          onMouseLeave={e => { if (!isResizing.current) e.currentTarget.style.background = "transparent"; }}
+        />
+
         <RightSidebar
           projectId={projectId}
           scriptId={activeScriptId}
           editorContent={editorRef.current?.innerText || ""}
           aiResult={aiResult && !aiResult.suggestions ? aiResult : null}
           onClearResult={() => setAiResult(null)}
-          comicImage={comicImage}
-          comicLoading={comicLoading}
-          onClearComic={() => setComicImage(null)}
-          writingMode={writingMode}
-          onWritingModeChange={setWritingMode}
-          writingSuggestions={writingSuggestions}
-          onClearWritingSuggestions={() => setWritingSuggestions([])}
+          contradictions={contradictions}
+          onResolveContradiction={async (contraId) => {
+            await resolveContradiction(contraId);
+            refreshContradictions();
+          }}
+          onRefreshContradictions={refreshContradictions}
+          suggestions={suggestions}
+          onClearSuggestions={() => setSuggestions([])}
+          onInsertIntoEditor={insertTextIntoEditor}
+          newIssueCount={newIssueCount}
+          newSuggestionCount={newSuggestionCount}
+          onDismissAlerts={() => { setNewIssueCount(0); setNewSuggestionCount(0); }}
+          width={sidebarWidth}
+          onAfterSend={(message) => {
+            if (hasOrchestrated.current || !activeScriptId) return;
+            hasOrchestrated.current = true;
+            // Check the user's idea against the full story — combine both for best contradiction coverage
+            const storyContent = editorRef.current?.innerText || "";
+            const textToCheck = message + (storyContent.trim() ? "\n\n" + storyContent : "");
+            if (textToCheck.trim().length < 20) return;
+            orchestrateAnalysis(activeScriptId, textToCheck, true)
+              .then(res => {
+                if (res.issues?.length > 0) {
+                  setContradictions(res.issues);
+                  setNewIssueCount(res.issues.length);
+                }
+                if (res.suggestions?.length > 0) {
+                  setSuggestions(res.suggestions);
+                  setNewSuggestionCount(res.suggestions.length);
+                }
+              })
+              .catch(err => console.error("Background orchestration failed:", err));
+          }}
         />
       </div>
+
+      {/* ── Comic Strip Modal (outside right sidebar) ── */}
+      {showComicModal && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 100,
+            background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            animation: "fadeUp 0.2s ease both",
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setShowComicModal(false); }}
+        >
+          <div style={{
+            background: "#fef6ee", borderRadius: "20px",
+            width: "90vw", maxWidth: "900px", maxHeight: "85vh",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+            display: "flex", flexDirection: "column", overflow: "hidden",
+          }}>
+            {/* Modal header */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "1.25rem 1.5rem", borderBottom: "1px solid #e8e2d9",
+            }}>
+              <div>
+                <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.3rem", color: "#1a1510", marginBottom: "0.15rem" }}>
+                  🖼️ Comic Strip
+                </h2>
+                <p style={{ fontSize: "0.78rem", color: "#9e9589" }}>
+                  {comicStripLoading ? "Generating panels…" : `${comicPanels.length} panel${comicPanels.length !== 1 ? "s" : ""} generated`}
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                {/* PDF Download button */}
+                {comicPanels.length > 0 && !comicStripLoading && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const blob = await downloadComicPdf(activeScriptId || "draft", comicPanels, project?.title || "Comic Strip");
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `${project?.title || "comic-strip"}.pdf`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch (err) {
+                        console.error("PDF download failed:", err);
+                      }
+                    }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "0.4rem",
+                      padding: "0.5rem 1rem", borderRadius: "10px",
+                      border: "none", background: "#047857", color: "#fff",
+                      fontFamily: "'DM Sans', sans-serif", fontSize: "0.82rem", fontWeight: 600,
+                      cursor: "pointer", transition: "all 0.15s",
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7,10 12,15 17,10" /><line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Download PDF
+                  </button>
+                )}
+                {/* Close button */}
+                <button
+                  onClick={() => setShowComicModal(false)}
+                  style={{
+                    width: "32px", height: "32px", borderRadius: "8px",
+                    border: "none", background: "transparent", color: "#9e9589",
+                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "1.1rem",
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Modal body — panels grid */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "1.25rem 1.5rem" }}>
+              {comicStripLoading && (
+                <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
+                  <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🎨</div>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "0.6rem" }}>
+                    <div style={{ width: "18px", height: "18px", borderRadius: "50%", border: "3px solid #e8e2d9", borderTopColor: "#047857", animation: "spin 0.8s linear infinite" }} />
+                    <span style={{ fontSize: "0.9rem", color: "#9e9589" }}>Generating comic panels… this may take 30–60 seconds</span>
+                  </div>
+                </div>
+              )}
+
+              {comicPanels.length > 0 && (
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: comicPanels.length === 1 ? "1fr" : "repeat(2, 1fr)",
+                  gap: "1rem",
+                }}>
+                  {comicPanels.map((panel, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        background: "#fff", borderRadius: "12px",
+                        border: "1px solid #e8e2d9",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                        overflow: "hidden",
+                        animation: `fadeUp 0.3s ease ${i * 0.1}s both`,
+                      }}
+                    >
+                      <img
+                        src={`data:image/png;base64,${panel.image_base64}`}
+                        alt={`Panel ${i + 1}`}
+                        style={{ width: "100%", display: "block" }}
+                      />
+                      <div style={{ padding: "0.6rem 0.75rem" }}>
+                        <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#047857", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                          Panel {i + 1}
+                        </span>
+                        <p style={{ fontSize: "0.78rem", color: "#4a4540", lineHeight: 1.45, marginTop: "0.2rem" }}>
+                          {panel.source_text.length > 120 ? panel.source_text.slice(0, 120) + "…" : panel.source_text}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

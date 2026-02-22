@@ -12,6 +12,7 @@ from services.enhancement_service import EnhancementService
 from ai.groq_service import generate_chat_reply
 from ai.writing_tools import handle_ai_action, ai_tweak_plot, ai_auto_suggest
 from ai.fact_checker import fact_check_with_rag
+from ai.flow import orchestrate_analysis
 
 router = APIRouter()
 
@@ -53,6 +54,10 @@ class TweakPlotRequest(BaseModel):
 class AutoSuggestRequest(BaseModel):
     script_id: str
     recent_text: str  # Last ~500 words the user has typed
+
+class OrchestrateRequest(BaseModel):
+    text: str
+    run_suggestions: bool = True
 
 @router.post("/scripts/{script_id}/analyze")
 async def analyze_script(script_id: str, request: AnalyzeRequest):
@@ -133,6 +138,28 @@ async def analyze_script(script_id: str, request: AnalyzeRequest):
         "script_id": script_id,
         "contradictions_found": len(saved_flags)
     }
+
+@router.post("/scripts/{script_id}/orchestrate")
+async def orchestrate_script(script_id: str, request: OrchestrateRequest):
+    """
+    Full analysis pipeline via flow.py orchestration.
+    Runs KG build → contradiction detection → auto-suggestions in one call.
+    Called after the user's first AI interaction on a script.
+    Returns issues, suggestions, and KG stats for the alert system.
+    """
+    if not request.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+    try:
+        result = await orchestrate_analysis(
+            script_id=script_id,
+            text=request.text,
+            run_suggestions=request.run_suggestions,
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/scripts/{script_id}/story_bible")
 async def get_story_bible(script_id: str):
