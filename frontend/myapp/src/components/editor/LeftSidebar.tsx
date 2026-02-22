@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface Chapter {
   id: string;
   title: string;
   wordCount: number;
-  active?: boolean;
+  charStart: number;
 }
 
 interface Props {
@@ -15,23 +15,31 @@ interface Props {
   onBack: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  chapters?: Chapter[];
+  activeChapterId?: string;
+  onChapterClick?: (chapterId: string) => void;
 }
 
-const defaultChapters: Chapter[] = [
-  { id: "c1", title: "Untitled Document", wordCount: 0, active: true },
-];
-
-function LeftSidebar({ projectTitle, projectEmoji, onBack, collapsed, onToggleCollapse }: Props) {
-  const [chapters, setChapters] = useState<Chapter[]>(defaultChapters);
-  const [activeChapter, setActiveChapter] = useState("c1");
+function LeftSidebar({ projectTitle, projectEmoji, onBack, collapsed, onToggleCollapse, chapters: parentChapters, activeChapterId, onChapterClick }: Props) {
+  const defaultChapters: Chapter[] = [{ id: "ch-1", title: "Chapter 1", wordCount: 0, charStart: 0 }];
+  const chapters = parentChapters && parentChapters.length > 0 ? parentChapters : defaultChapters;
+  const [activeChapter, setActiveChapter] = useState(activeChapterId || "ch-1");
   const [storyBible, setStoryBible] = useState(true);
   const [addingChapter, setAddingChapter] = useState(false);
   const [newChapterName, setNewChapterName] = useState("");
+  const [manualChapters, setManualChapters] = useState<Chapter[]>([]);
+
+  // Sync active chapter from parent
+  useEffect(() => {
+    if (activeChapterId) setActiveChapter(activeChapterId);
+  }, [activeChapterId]);
+
+  const allChapters = [...chapters, ...manualChapters];
 
   const addChapter = () => {
-    const title = newChapterName.trim() || `Chapter ${chapters.length + 1}`;
-    const newChapter: Chapter = { id: `c${Date.now()}`, title, wordCount: 0 };
-    setChapters([...chapters, newChapter]);
+    const title = newChapterName.trim() || `Chapter ${allChapters.length + 1}`;
+    const newChapter: Chapter = { id: `manual-${Date.now()}`, title, wordCount: 0, charStart: 0 };
+    setManualChapters(prev => [...prev, newChapter]);
     setActiveChapter(newChapter.id);
     setAddingChapter(false);
     setNewChapterName("");
@@ -140,16 +148,19 @@ function LeftSidebar({ projectTitle, projectEmoji, onBack, collapsed, onToggleCo
             />
           </div>
         )}
-        {chapters.map((ch) => (
+        {allChapters.map((ch) => (
           <button
             key={ch.id}
-            onClick={() => setActiveChapter(ch.id)}
+            onClick={() => {
+              setActiveChapter(ch.id);
+              onChapterClick?.(ch.id);
+            }}
             style={{
               width: "100%", display: "flex", alignItems: "center", gap: "0.5rem",
               padding: "0.55rem 0.75rem", borderRadius: "8px", border: "none",
               borderLeft: activeChapter === ch.id ? "3px solid #047857" : "3px solid transparent",
-              background: activeChapter === ch.id ? "rgba(4,120,87,0.08)" : "transparent",
-              color: activeChapter === ch.id ? "#047857" : "#4a4540",
+              background: activeChapter === ch.id ? "rgba(4,120,87,0.12)" : "transparent",
+              color: "#4a4540",
               fontFamily: "'DM Sans', sans-serif", fontSize: "0.83rem",
               cursor: "pointer", textAlign: "left", transition: "all 0.2s ease",
             }}
@@ -161,6 +172,11 @@ function LeftSidebar({ projectTitle, projectEmoji, onBack, collapsed, onToggleCo
               <polyline points="14,2 14,8 20,8" />
             </svg>
             <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ch.title}</span>
+            {ch.wordCount > 0 && (
+              <span style={{ fontSize: "0.68rem", color: "#9e9589", flexShrink: 0 }}>
+                {ch.wordCount.toLocaleString()}w
+              </span>
+            )}
           </button>
         ))}
       </div>

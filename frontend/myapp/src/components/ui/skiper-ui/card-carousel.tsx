@@ -8,7 +8,6 @@ import "swiper/css"
 import "swiper/css/effect-coverflow"
 import "swiper/css/pagination"
 import "swiper/css/navigation"
-import { SparklesIcon } from "lucide-react"
 import {
   Autoplay,
   EffectCoverflow,
@@ -16,130 +15,157 @@ import {
   Pagination,
 } from "swiper/modules"
 
-import { Badge } from "@/components/ui/skiper-ui/badge"
-
 interface CarouselProps {
   images: { src: string; alt: string }[]
   autoplayDelay?: number
   showPagination?: boolean
   showNavigation?: boolean
+  title?: string
+  subtitle?: string
 }
 
 export const CardCarousel: React.FC<CarouselProps> = ({
   images,
-  autoplayDelay = 1500,
+  autoplayDelay = 2500,
   showPagination = true,
   showNavigation = true,
+  title = "Character Profiles",
+  subtitle = "AI-generated character personas from your stories",
 }) => {
   const css = `
-  .swiper {
+  .persona-swiper {
     width: 100%;
-    padding-bottom: 50px;
+    padding: 20px 0 50px;
   }
-  
-  .swiper-slide {
-    background-position: center;
-    background-size: cover;
-    width: 300px;
-    /* height: 300px; */
-    /* margin: 20px; */
+
+  .persona-swiper .swiper-slide {
+    width: 320px;
+    height: 420px;
+    border-radius: 20px;
+    overflow: hidden;
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
   }
-  
-  .swiper-slide img {
+
+  .persona-swiper .swiper-slide-active {
+    transform: scale(1.05);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+  }
+
+  .persona-swiper .swiper-slide:not(.swiper-slide-active) {
+    opacity: 0.7;
+  }
+
+  .persona-swiper .swiper-slide img {
     display: block;
     width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 20px;
   }
-  
-  
+
+  .persona-swiper .swiper-3d .swiper-slide-shadow-left,
+  .persona-swiper .swiper-3d .swiper-slide-shadow-right {
+    background-image: none !important;
+    background: none !important;
+  }
+
   .swiper-3d .swiper-slide-shadow-left {
     background-image: none;
   }
-  .swiper-3d .swiper-slide-shadow-right{
+  .swiper-3d .swiper-slide-shadow-right {
     background: none;
   }
-  `
-  return (
-    <section className="w-ace-y-4">
-      <style>{css}</style>
-      <div className="mx-auto w-full max-w-4xl rounded-[24px] border border-black/5 p-2 shadow-sm md:rounded-t-[44px]">
-        <div className="relative mx-auto flex w-full flex-col rounded-[24px] border border-black/5 bg-neutral-800/5 p-2 shadow-sm md:items-start md:gap-8 md:rounded-b-[20px] md:rounded-t-[40px] md:p-2">
-          <Badge
-            variant="outline"
-            className="absolute left-4 top-6 rounded-[14px] border border-black/10 text-base md:left-6"
-          >
-            <SparklesIcon className="fill-[#EEBDE0] stroke-1 text-neutral-800" />{" "}
-            UnLatest component
-          </Badge>
-          <div className="flex flex-col justify-center pb-2 pl-4 pt-14 md:items-center">
-            <div className="flex gap-2">
-              <div>
-                <h3 className="text-4xl opacity-85 font-bold tracking-tight">
-                   Persona
-                </h3>
-                <p>Seamless Images carousel animation.</p>
-              </div>
-            </div>
-          </div>
 
-          <div className="flex w-full items-center justify-center gap-4">
-            <div className="w-full">
-              <Swiper
-                spaceBetween={50}
-                autoplay={{
-                  delay: autoplayDelay,
-                  disableOnInteraction: false,
-                }}
-                effect={"coverflow"}
-                grabCursor={true}
-                centeredSlides={true}
-                loop={true}
-                slidesPerView={"auto"}
-                coverflowEffect={{
-                  rotate: 0,
-                  stretch: 0,
-                  depth: 100,
-                  modifier: 2.5,
-                }}
-                pagination={showPagination}
-                navigation={
-                  showNavigation
-                    ? {
-                        nextEl: ".swiper-button-next",
-                        prevEl: ".swiper-button-prev",
-                      }
-                    : undefined
+  .persona-swiper .swiper-pagination-bullet {
+    background: #047857;
+    opacity: 0.3;
+    width: 8px;
+    height: 8px;
+    transition: all 0.3s ease;
+  }
+
+  .persona-swiper .swiper-pagination-bullet-active {
+    opacity: 1;
+    width: 24px;
+    border-radius: 4px;
+  }
+  `
+
+  return (
+    <section className="space-y-4">
+      <style>{css}</style>
+      <div className="mx-auto w-full max-w-5xl">
+        {/* Header */}
+        <div className="mb-6 px-6">
+          <p className="text-sm font-medium uppercase tracking-widest text-emerald-700 mb-2">
+            ✦ Showcase
+          </p>
+          <h3 className="text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">
+            {title}
+          </h3>
+          <p className="mt-2 text-base text-gray-500 max-w-lg">
+            {subtitle}
+          </p>
+        </div>
+
+        {/* Carousel */}
+        <div className="w-full">
+          <Swiper
+            className="persona-swiper"
+            spaceBetween={30}
+            autoplay={{
+              delay: autoplayDelay,
+              disableOnInteraction: false,
+              pauseOnMouseEnter: true,
+            }}
+            effect={"coverflow"}
+            grabCursor={true}
+            centeredSlides={true}
+            loop={true}
+            slidesPerView={"auto"}
+            coverflowEffect={{
+              rotate: 0,
+              stretch: 0,
+              depth: 120,
+              modifier: 2,
+              slideShadows: false,
+            }}
+            pagination={showPagination ? { clickable: true } : false}
+            navigation={
+              showNavigation
+                ? {
+                  nextEl: ".swiper-button-next",
+                  prevEl: ".swiper-button-prev",
                 }
-                modules={[EffectCoverflow, Autoplay, Pagination, Navigation]}
-              >
-                {images.map((image, index) => (
-                  <SwiperSlide key={index}>
-                    <div className="size-full rounded-3xl">
-                      <Image
-                        src={image.src}
-                        width={500}
-                        height={500}
-                        className="size-full rounded-xl"
-                        alt={image.alt}
-                      />
-                    </div>
-                  </SwiperSlide>
-                ))}
-                {images.map((image, index) => (
-                  <SwiperSlide key={index}>
-                    <div className="size-full rounded-3xl">
-                      <Image
-                        src={image.src}
-                        width={200}
-                        height={200}
-                        className="size-full rounded-xl"
-                        alt={image.alt}
-                      />
-                    </div>
-                  </SwiperSlide>
-                ))}
-              </Swiper>
-            </div>
-          </div>
+                : undefined
+            }
+            modules={[EffectCoverflow, Autoplay, Pagination, Navigation]}
+          >
+            {images.map((image, index) => (
+              <SwiperSlide key={index}>
+                <div style={{
+                  width: "100%",
+                  height: "100%",
+                  borderRadius: "20px",
+                  overflow: "hidden",
+                  background: "#f0ebe3",
+                }}>
+                  <Image
+                    src={image.src}
+                    width={640}
+                    height={840}
+                    className="rounded-[20px]"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                    alt={image.alt}
+                  />
+                </div>
+              </SwiperSlide>
+            ))}
+          </Swiper>
         </div>
       </div>
     </section>
