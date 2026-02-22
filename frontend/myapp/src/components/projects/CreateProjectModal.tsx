@@ -9,7 +9,7 @@ const GENRES: Genre[] = ["Fantasy", "Sci-Fi", "Mystery", "Romance", "Thriller", 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (data: Omit<Project, "id" | "createdAt" | "updatedAt" | "wordCount" | "content">) => Project;
+  onCreate: (data: Omit<Project, "id" | "createdAt" | "updatedAt" | "wordCount" | "content">) => Promise<Project> | Project;
   onCreated: (project: Project) => void;
 }
 
@@ -32,13 +32,13 @@ interface Props {
     }
   }, [isOpen]);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!title.trim()) {
       setTitleError(true);
       titleRef.current?.focus();
       return;
     }
-    const project = onCreate({ title: title.trim(), description: description.trim(), emoji, genre });
+    const project = await onCreate({ title: title.trim(), description: description.trim(), emoji, genre });
     onCreated(project);
     onClose();
   };

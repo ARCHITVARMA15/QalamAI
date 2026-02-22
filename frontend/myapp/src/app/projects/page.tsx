@@ -29,7 +29,7 @@ function ProjectsPage() {
   const filtered = projects.filter(
     (p) =>
       p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description.toLowerCase().includes(searchQuery.toLowerCase())
+      (p.description ?? "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (

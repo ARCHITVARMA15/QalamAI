@@ -97,9 +97,6 @@ export default function ProjectEditorPage() {
   const [newIssueCount, setNewIssueCount] = useState(0);
   const [newSuggestionCount, setNewSuggestionCount] = useState(0);
 
-  // Track whether we've already triggered orchestration after the first user query
-  const hasOrchestrated = useRef(false);
-
   // Resizable sidebar
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const isResizing = useRef(false);
@@ -1221,13 +1218,10 @@ export default function ProjectEditorPage() {
           onDismissAlerts={() => { setNewIssueCount(0); setNewSuggestionCount(0); }}
           width={sidebarWidth}
           onAfterSend={(message) => {
-            if (hasOrchestrated.current || !activeScriptId) return;
-            hasOrchestrated.current = true;
-            // Check the user's idea against the full story — combine both for best contradiction coverage
+            if (!activeScriptId) return;
             const storyContent = editorRef.current?.innerText || "";
-            const textToCheck = message + (storyContent.trim() ? "\n\n" + storyContent : "");
-            if (textToCheck.trim().length < 20) return;
-            orchestrateAnalysis(activeScriptId, textToCheck, true)
+            const textToCheck = storyContent.trim() ? storyContent : message;
+            orchestrateAnalysis(activeScriptId, textToCheck, true, message)
               .then(res => {
                 if (res.issues?.length > 0) {
                   setContradictions(res.issues);

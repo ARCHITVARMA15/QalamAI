@@ -48,6 +48,7 @@ async def orchestrate_analysis(
     script_id: str,
     text: str,
     run_suggestions: bool = True,
+    user_message: str = "",
 ) -> dict:
     """
     Runs the full analysis pipeline in sequence:
@@ -170,6 +171,7 @@ async def orchestrate_analysis(
             suggest_result = await ai_auto_suggest(
                 recent_text=text[-2500:],
                 story_bible_summary=story_bible_summary,
+                user_intent=user_message,
             )
             suggestions = suggest_result.get("suggestions", [])
         except Exception as e:

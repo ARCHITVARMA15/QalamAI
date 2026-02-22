@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional
-from config.db_helpers import insert_document, find_by_id, find_many, update_document
+from config.db_helpers import insert_document, find_by_id, find_many, update_document, delete_document
 from datetime import datetime
 from data.file_parser import DocumentParser
 
@@ -44,9 +44,9 @@ async def get_project(project_id: str):
 
 @router.delete("/projects/{project_id}")
 async def delete_project(project_id: str):
-    # Depending on DB structure, you'd delete or mark inactive. We'll simulate a find_and_delete or use db_helpers if available.
-    # Currently db_helpers might not have a delete function, so let's import the DB directly or assume update to inactive.
-    # For now, let's just return success so the frontend doesn't crash, but ideally we delete the document.
+    deleted = await delete_document("projects", project_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Project not found")
     return {"status": "success"}
 
 class ProjectUpdate(BaseModel):

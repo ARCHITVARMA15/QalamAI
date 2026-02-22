@@ -74,6 +74,7 @@ class AutoSuggestRequest(BaseModel):
 class OrchestrateRequest(BaseModel):
     text: str
     run_suggestions: bool = True
+    user_message: str = ""  # Raw chat message — used as intent context for suggestions
 
 @router.post("/scripts/{script_id}/analyze")
 async def analyze_script(script_id: str, request: AnalyzeRequest):
@@ -171,6 +172,7 @@ async def orchestrate_script(script_id: str, request: OrchestrateRequest):
             script_id=script_id,
             text=request.text,
             run_suggestions=request.run_suggestions,
+            user_message=request.user_message,
         )
         return result
     except Exception as e:

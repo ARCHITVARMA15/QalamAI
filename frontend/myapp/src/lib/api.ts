@@ -353,11 +353,12 @@ export async function orchestrateAnalysis(
   scriptId: string,
   text: string,
   runSuggestions: boolean = true,
+  userMessage: string = "",
 ): Promise<OrchestrateResult> {
   const res = await fetch(`http://localhost:8000/api/scripts/${scriptId}/orchestrate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, run_suggestions: runSuggestions }),
+    body: JSON.stringify({ text, run_suggestions: runSuggestions, user_message: userMessage }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();

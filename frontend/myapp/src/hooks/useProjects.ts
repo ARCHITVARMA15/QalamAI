@@ -16,14 +16,19 @@ export function useProjects() {
       const res = await fetch(`http://localhost:8000/api/projects?owner_id=${ownerId}`);
       if (res.ok) {
         const data = await res.json();
-        // Map backend _id to frontend id, and provide safe defaults
         const mapped = data.map((p: any) => ({
           ...p,
           id: p._id || p.id,
           wordCount: p.wordCount || 0,
           content: p.content || "",
+          description: p.description || "",
           emoji: p.emoji || "📝",
           genre: p.genre || "Fiction",
+          // Normalize date fields: backend returns ISO strings or timestamps
+          createdAt: p.createdAt ? new Date(p.createdAt).getTime()
+            : p.created_at ? new Date(p.created_at).getTime() : Date.now(),
+          updatedAt: p.updatedAt ? new Date(p.updatedAt).getTime()
+            : p.updated_at ? new Date(p.updated_at).getTime() : Date.now(),
         }));
         setProjects(mapped);
       }

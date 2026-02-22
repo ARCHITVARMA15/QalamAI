@@ -442,28 +442,32 @@ async def ai_tweak_plot(content: str, instruction: str, script_id: str) -> dict:
 # Writing Mode — proactive plot-consistency suggestions
 # ═════════════════════════════════════════════════════════════════════════════
 
-async def ai_auto_suggest(recent_text: str, story_bible_summary: str) -> dict:
+async def ai_auto_suggest(recent_text: str, story_bible_summary: str, user_intent: str = "") -> dict:
     """
     Proactively scan a writer's recent output against the Knowledge Graph and
-    return actionable "Suggested Tweaks" — e.g. potential contradictions or
+    return actionable "Suggested Tweaks" -- e.g. potential contradictions or
     continuity opportunities the writer might not have noticed yet.
 
+    user_intent: the raw message the user typed in chat (what they're thinking of writing).
     Returns a list of short, specific suggestion strings.
     """
     system = (
         "You are Kalam AI — a continuity analyst for screenwriters. "
-        "Given a story bible summary and a recent passage of new writing, "
+        "Given a story bible, recent writing, and optionally the writer's current question or idea, "
         "identify up to 4 proactive suggestions the writer should consider. "
         "Focus on: potential contradictions with the story bible, "
         "opportunities to reference established facts, "
         "logic gaps, or timeline inconsistencies. "
+        "If a writer's intent is provided, make your suggestions directly relevant to that idea. "
         "Be specific — mention character names, facts, or events by name. "
         "Return your response as a JSON array of suggestion strings. Example:\n"
-        '[\"Suggestion 1.\", \"Suggestion 2.\"]\n'
+        '["Suggestion 1.", "Suggestion 2."]\n'
         "Return ONLY the JSON array — no other text.\n"
     )
 
     user_msg = ""
+    if user_intent:
+        user_msg += f"Writer's current question / intent:\n{user_intent}\n\n"
     if story_bible_summary:
         user_msg += f"Story Bible Context:\n{story_bible_summary}\n\n"
     user_msg += f"Recent writing (last ~500 words):\n\n{recent_text[-2500:]}"
