@@ -9,7 +9,7 @@ import { Project } from "@/types/project";
 import ProjectCard from "@/components/projects/ProjectCard";
 import CreateProjectModal from "@/components/projects/CreateProjectModal";
 
- function ProjectsPage() {
+function ProjectsPage() {
   const router = useRouter();
   const { projects, isLoaded, createProject, deleteProject, renameProject } = useProjects();
   const [modalOpen, setModalOpen] = useState(false);
@@ -50,7 +50,7 @@ import CreateProjectModal from "@/components/projects/CreateProjectModal";
       {/* ─── Navbar ─── */}
       <nav style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 2.5rem", height: "64px", background: "rgba(250,247,244,0.88)", backdropFilter: "blur(12px)", borderBottom: "1px solid #e8e2d9" }}>
         <a href="/" style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.5rem", letterSpacing: "-0.02em", color: "#1a1510", textDecoration: "none" }}>
-          Write<span style={{ color: "#c96a3b" }}>AI</span>
+          <span style={{ color: "#1a7a5e" }}>KALAMAI</span>
         </a>
 
         {/* RIGHT SIDE: Dashboard + New Project */}

@@ -904,6 +904,15 @@ export default function ProjectEditorPage() {
           🕸️ Insight
         </button>
 
+
+        <button onClick={() => router.push(`/projects/${projectId}/video`)}
+          style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.4rem 0.9rem", borderRadius: "8px", border: "1.5px solid #e8e2d9", background: "#fff", color: "#4a4540", fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", cursor: "pointer", transition: "all 0.2s" }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = "#047857"; e.currentTarget.style.color = "#047857"; e.currentTarget.style.background = "rgba(4,120,87,0.04)"; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = "#e8e2d9"; e.currentTarget.style.color = "#4a4540"; e.currentTarget.style.background = "#fff"; }}
+        >
+          🎬 Video
+        </button>
+
         {/* Stuck? button */}
         <button
           onClick={() => router.push(`/projects/${projectId}/stuck`)}
