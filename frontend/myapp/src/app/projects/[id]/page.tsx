@@ -855,6 +855,7 @@ export default function ProjectEditorPage() {
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes stuckPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(4,120,87,0); } 50% { box-shadow: 0 0 12px 2px rgba(4,120,87,0.15); } }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #d4cdc5; border-radius: 3px; }
@@ -901,6 +902,26 @@ export default function ProjectEditorPage() {
           onMouseLeave={e => { e.currentTarget.style.borderColor = "#e8e2d9"; e.currentTarget.style.color = "#4a4540"; e.currentTarget.style.background = "#fff"; }}
         >
           🕸️ Insight
+        </button>
+
+        {/* Stuck? button */}
+        <button
+          onClick={() => router.push(`/projects/${projectId}/stuck`)}
+          title="Get More Ideas"
+          style={{
+            display: "flex", alignItems: "center", gap: "0.4rem",
+            padding: "0.4rem 0.9rem", borderRadius: "8px",
+            border: "1.5px solid rgba(4,120,87,0.3)",
+            background: "linear-gradient(135deg, rgba(4,120,87,0.06), rgba(4,120,87,0.02))",
+            color: "#047857",
+            fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", fontWeight: 600,
+            cursor: "pointer", transition: "all 0.2s",
+            animation: "stuckPulse 2.5s ease-in-out infinite",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(4,120,87,0.1)"; e.currentTarget.style.borderColor = "#047857"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(4,120,87,0.2)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(4,120,87,0.06), rgba(4,120,87,0.02))"; e.currentTarget.style.borderColor = "rgba(4,120,87,0.3)"; e.currentTarget.style.boxShadow = "none"; }}
+        >
+          🧠 Stuck?
         </button>
 
         {/* Dashboard button */}
