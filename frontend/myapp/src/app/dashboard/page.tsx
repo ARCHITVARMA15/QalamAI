@@ -283,7 +283,7 @@ function DashboardPage() {
 
         {/* Logo */}
         <a href="/projects" style={{ fontFamily: "'DM Serif Display',serif", fontSize: "1.2rem", color: "#1a1510", textDecoration: "none", letterSpacing: "-0.02em" }}>
-          <span style={{ color: "#1a7a5e;" }}>KALAMAI</span>
+          <span style={{ color: "#1a7a5e" }}>KALAMAI</span>
         </a>
 
         <div style={{ width: "1px", height: "18px", background: "#e8e2d9" }} />

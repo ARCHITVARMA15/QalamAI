@@ -57,7 +57,7 @@
 // function Hero() {
 //   return (
 //     <section className="relative overflow-hidden">
-      
+
 //       {/* ── Background: Skiper Crowd Canvas ── */}
 //       <div className="absolute inset-0 z-0">
 //         <CrowdCanvas
@@ -131,7 +131,7 @@ function Hero() {
       />
 
       {/* ── Foreground Content ── */}
-      <div className="relative z-10 mx-auto max-w-4xl px-6 pt-32 pb-0 text-center">
+      <div className="relative z-10 mx-auto max-w-4xl px-6 pt-32 pb-16 text-center">
         <motion.div variants={fadeUp} initial="hidden" animate="visible">
           <Badge text="AI-powered writing assistant" />
         </motion.div>
@@ -173,26 +173,26 @@ function Hero() {
 
       {/* ── CrowdCanvas pinned to bottom — people walk on the "ground" ── */}
       <div
-        className="absolute bottom-0 left-0 w-full z-10 pointer-events-none"
-        style={{ height: "38vh" }}
+        className="absolute bottom-0 left-0 w-full z-0 pointer-events-none"
+        style={{ height: "65vh" }}
       >
         {/* Ground fade — makes it look like they're standing on the page */}
         <div
           className="absolute inset-x-0 bottom-0 z-20"
           style={{
-            height: "35%",
+            height: "30%",
             background: "linear-gradient(to top, #fdf5ee 0%, transparent 100%)",
           }}
         />
-        {/* Top fade — characters emerge from behind content */}
+        {/* Top fade — smooth blend, covers most of the canvas so characters emerge gently */}
         <div
           className="absolute inset-x-0 top-0 z-20"
           style={{
-            height: "30%",
-            background: "linear-gradient(to bottom, #fdf5ee 0%, transparent 100%)",
+            height: "70%",
+            background: "linear-gradient(to bottom, #fdf5ee 20%, rgba(253,245,238,0.6) 50%, transparent 100%)",
           }}
         />
-        <div style={{ opacity: 0.13, height: "100%", width: "100%" }}>
+        <div style={{ opacity: 0.1, height: "100%", width: "100%" }}>
           <CrowdCanvas
             src="/images/peeps/all-peeps.png"
             rows={6}
