@@ -62,7 +62,7 @@ async def generate_chat_reply(messages: list, context: str = "", story_bible: st
     try:
         response = await client.chat.completions.create(
             messages=formatted_messages,
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             temperature=0.3 if mode == "Fact Check" else 0.7,
             max_tokens=1024,
             top_p=1,

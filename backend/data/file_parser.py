@@ -14,7 +14,7 @@ class DocumentParser:
     """
 
     @classmethod
-    async def process_file(cls, file: UploadFile) -> list[str]:
+    async def process_file(cls, file: UploadFile) -> list[dict]:
         content = await file.read()
         filename = file.filename.lower()
 
@@ -29,8 +29,8 @@ class DocumentParser:
                 raise HTTPException(status_code=400, detail="Unsupported file format. Please upload PDF, DOCX, or TXT.")
 
             cleaned_text = cls.clean_text(raw_text)
-            stories = cls.split_stories(cleaned_text)
-            return stories
+            chapters = cls.split_chapters(cleaned_text)
+            return chapters
 
         except Exception as e:
             if isinstance(e, HTTPException):

@@ -294,7 +294,7 @@ async def fact_check_with_rag(
     try:
         response = await client.chat.completions.create(
             messages=formatted_messages,
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             temperature=0.2,  # Low temp for precise, factual responses
             max_tokens=1500,
             top_p=1,

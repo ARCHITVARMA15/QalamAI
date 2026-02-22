@@ -25,7 +25,7 @@ except Exception as e:
     print(f"Warning: Failed to initialize Groq writing-tools client: {e}")
     client = None
 
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "llama-3.1-8b-instant"
 
 # ── Base system prompt shared by all actions ─────────────────────────────────
 BASE_SYSTEM = (
@@ -42,7 +42,7 @@ def _word_count(text: str) -> int:
 
 
 # ── Helper: call Groq with action-specific prompts ──────────────────────────
-async def _call_groq(system_prompt: str, user_prompt: str, temperature: float = 0.7, max_tokens: int = 1024) -> str:
+async def _call_groq(system_prompt: str, user_prompt: str, temperature: float = 0.7, max_tokens: int = 1024, model: str = None) -> str:
     """
     Low-level wrapper around the Groq chat completion API.
     Returns the raw text response or an error message.
@@ -56,7 +56,7 @@ async def _call_groq(system_prompt: str, user_prompt: str, temperature: float = 
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            model=MODEL,
+            model=model if model else MODEL,
             temperature=temperature,
             max_tokens=max_tokens,
             top_p=1,
@@ -472,7 +472,8 @@ async def ai_auto_suggest(recent_text: str, story_bible_summary: str, user_inten
         user_msg += f"Story Bible Context:\n{story_bible_summary}\n\n"
     user_msg += f"Recent writing (last ~500 words):\n\n{recent_text[-2500:]}"
 
-    raw = await _call_groq(system, user_msg, temperature=0.4, max_tokens=600)
+    # Use a faster, lighter model for background suggestions to prevent rate limits
+    raw = await _call_groq(system, user_msg, temperature=0.4, max_tokens=600, model="llama-3.1-8b-instant")
 
     # Reuse the brainstorm suggestion parser — same JSON array format
     suggestions = _parse_suggestions(raw)

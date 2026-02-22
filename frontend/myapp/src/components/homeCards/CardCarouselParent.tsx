@@ -6,11 +6,11 @@ import { CardCarousel } from "@/components/ui/skiper-ui/card-carousel";
 function CardCarouselParent() {
   const images = [
     { src: "/images/image1.png", alt: "Character Profile 1" },
-    { src: "/images/image4.png", alt: "Character Profile 2" },
-    { src: "/images/image3.png", alt: "Character Profile 3" },
-    { src: "/images/image4.png", alt: "Character Profile 4" },
-    { src: "/images/image5.png", alt: "Character Profile 5" },
-    { src: "/images/image2.png", alt: "Character Profile 6" },
+    { src: "/images/image3.png", alt: "Character Profile 2" },
+    { src: "/images/image4.png", alt: "Character Profile 3" },
+    { src: "/images/image5.png", alt: "Character Profile 4" },
+    { src: "/images/image1.png", alt: "Character Profile 5" },
+    { src: "/images/image3.png", alt: "Character Profile 6" },
   ];
 
   return (
