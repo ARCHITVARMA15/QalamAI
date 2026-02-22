@@ -1,545 +1,11 @@
-// "use client";
 
-// import { useState, useEffect, useRef, useCallback } from "react";
-// import { useParams, useRouter } from "next/navigation";
-// import { callAIAction, saveProject, UploadResponse } from "@/lib/api";
-// import LeftSidebar from "@/components/editor/LeftSidebar";
-// import RightSidebar from "@/components/editor/RightSidebar";
-// import EditorToolbar from "@/components/editor/EditorToolbar";
-// import AIActionBar from "@/components/editor/AIActionBar";
-// import FileUploadZone from "@/components/editor/FileUploadZone";
-// import KnowledgeGraph from "@/components/editor/KnowledgeGraph";
-
-// interface Project {
-//   id: string;
-//   title: string;
-//   emoji: string;
-//   description: string;
-//   genre: string;
-//   content: string;
-//   wordCount: number;
-//   createdAt: number;
-//   updatedAt: number;
-// }
-
-// interface AIResult {
-//   text: string;
-//   suggestions?: string[];
-//   changes?: { type: string; description: string }[];
-// }
-
-// export default function ProjectEditorPage() {
-//   const params = useParams();
-//   const router = useRouter();
-//   const projectId = params.id as string;
-//   const editorRef = useRef<HTMLDivElement>(null);
-
-//   const [project, setProject] = useState<Project | null>(null);
-//   const [notFound, setNotFound] = useState(false);
-//   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-//   const [showUploadPanel, setShowUploadPanel] = useState(false);
-//   const [wordCount, setWordCount] = useState(0);
-//   const [isSaved, setIsSaved] = useState(true);
-//   const [aiLoading, setAiLoading] = useState(false);
-//   const [aiResult, setAiResult] = useState<AIResult | null>(null);
-//   const [hasSelection, setHasSelection] = useState(false);
-//   const [uploadedFiles, setUploadedFiles] = useState<UploadResponse[]>([]);
-//   const [activeScriptId, setActiveScriptId] = useState<string | null>(null);
-//   const [docTitle, setDocTitle] = useState("Untitled");
-//   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-//   // ─── Load project from Backend ───────────────────────────────
-//   useEffect(() => {
-//     // 1. Fetch top-level project metadata
-//     fetch(`http://localhost:8000/api/projects/${projectId}`)
-//       .then(res => res.json())
-//       .then(data => {
-//         // Map backend _id to frontend id if needed
-//         const mappedProject = { ...data, id: data._id || data.id };
-//         setProject(mappedProject);
-//         setDocTitle(data.title || "Untitled");
-
-//         if (editorRef.current && data.content) {
-//           editorRef.current.innerHTML = data.content;
-//           countWords();
-//         }
-//       })
-//       .catch(err => {
-//         console.error("Project not found", err);
-//         setNotFound(true);
-//       });
-//     // Fetch the latest script for this project from the backend
-//     fetch(`http://localhost:8000/api/projects/${projectId}/scripts`)
-//       .then(res => res.json())
-//       .then(scripts => {
-//         if (scripts && scripts.length > 0) {
-//           // Found existing scripts, use the most recent one
-//           const latestScript = scripts[0];
-//           setActiveScriptId(latestScript._id || latestScript.id);
-//           if (editorRef.current && latestScript.content) {
-//             editorRef.current.innerHTML = latestScript.content;
-//             countWords();
-//           }
-//         } else if (!activeScriptId) {
-//           // No scripts found for this project, auto-create one
-//           fetch(`http://localhost:8000/api/projects/${projectId}/scripts`, {
-//             method: "POST",
-//             headers: { "Content-Type": "application/json" },
-//             body: JSON.stringify({ title: "Untitled Document", content: "" })
-//           })
-//             .then(res => res.json())
-//             .then(data => {
-//               if (data.status === "success" && data.script_id) {
-//                 setActiveScriptId(data.script_id);
-//               }
-//             })
-//             .catch(err => console.error("Failed to init script:", err));
-//         }
-//       })
-//       .catch(err => console.error("Failed to fetch scripts:", err));
-//   }, [projectId]);
-
-//   // ─── Word count ──────────────────────────────────────────────────────────────
-//   const countWords = useCallback(() => {
-//     const text = editorRef.current?.innerText || "";
-//     const words = text.trim().split(/\s+/).filter(Boolean).length;
-//     setWordCount(words);
-//     return words;
-//   }, []);
-
-//   // ─── Selection tracking ──────────────────────────────────────────────────────
-//   useEffect(() => {
-//     const handleSelectionChange = () => {
-//       const sel = window.getSelection();
-//       setHasSelection(!!sel && sel.toString().length > 0);
-//     };
-//     document.addEventListener("selectionchange", handleSelectionChange);
-//     return () => document.removeEventListener("selectionchange", handleSelectionChange);
-//   }, []);
-
-//   // ─── Auto-save ───────────────────────────────────────────────────────────────
-//   const triggerSave = useCallback(() => {
-//     if (!project || !activeScriptId) return;
-//     setIsSaved(false);
-//     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-//     saveTimeoutRef.current = setTimeout(async () => {
-//       const content = editorRef.current?.innerHTML || "";
-//       const wc = countWords();
-//       await saveProject(activeScriptId, content, wc);
-//       setIsSaved(true);
-//     }, 1500);
-//   }, [project, countWords, activeScriptId]);
-
-//   const handleEditorInput = () => {
-//     countWords();
-//     triggerSave();
-//   };
-
-//   // ─── Formatting ──────────────────────────────────────────────────────────────
-//   const handleFormat = (command: string, value?: string) => {
-//     document.execCommand(command, false, value);
-//     editorRef.current?.focus();
-//   };
-
-//   const handleUndo = () => { document.execCommand("undo"); editorRef.current?.focus(); };
-//   const handleRedo = () => { document.execCommand("redo"); editorRef.current?.focus(); };
-
-//   // ─── Keyboard shortcuts ──────────────────────────────────────────────────────
-//   const handleKeyDown = (e: React.KeyboardEvent) => {
-//     if (e.metaKey || e.ctrlKey) {
-//       switch (e.key) {
-//         case "b": e.preventDefault(); handleFormat("bold"); break;
-//         case "i": e.preventDefault(); handleFormat("italic"); break;
-//         case "u": e.preventDefault(); handleFormat("underline"); break;
-//         case "z": e.preventDefault(); e.shiftKey ? handleRedo() : handleUndo(); break;
-//         case "s": e.preventDefault(); triggerSave(); break;
-//       }
-//     }
-//   };
-
-//   // ─── AI Actions ──────────────────────────────────────────────────────────────
-//   const handleAIAction = useCallback(async (action: string, options?: { tone?: string }) => {
-//     if (!project) return;
-//     setAiLoading(true);
-//     setAiResult(null);
-
-//     const selection = window.getSelection()?.toString() || "";
-//     const fullContent = editorRef.current?.innerText || "";
-
-//     try {
-//       const response = await callAIAction({
-//         action: action as "write" | "rewrite" | "describe" | "brainstorm" | "chat" | "enhance" | "tone",
-//         content: selection || fullContent,
-//         projectId: project.id,
-//         context: fullContent.slice(0, 500),
-//         tone: options?.tone,
-//         genre: project.genre,
-//       });
-
-//       // For write action, insert text into editor at cursor
-//       if (action === "write" && response.result) {
-//         editorRef.current?.focus();
-//         const sel = window.getSelection();
-//         if (sel && sel.rangeCount > 0) {
-//           const range = sel.getRangeAt(0);
-//           range.collapse(false);
-//           const textNode = document.createTextNode("\n\n" + response.result);
-//           range.insertNode(textNode);
-//           range.collapse(false);
-//           sel.removeAllRanges();
-//           sel.addRange(range);
-//         } else {
-//           editorRef.current!.innerHTML += `<p>${response.result}</p>`;
-//         }
-//         triggerSave();
-//       }
-
-//       setAiResult({
-//         text: response.result,
-//         suggestions: response.suggestions,
-//         changes: response.changes,
-//       });
-//     } catch (err) {
-//       setAiResult({ text: "Something went wrong. Please try again." });
-//     } finally {
-//       setAiLoading(false);
-//     }
-//   }, [project, triggerSave]);
-
-//   // ─── File upload handler ─────────────────────────────────────────────────────
-//   const handleFileUpload = useCallback((file: UploadResponse) => {
-//     setUploadedFiles(prev => [file, ...prev]);
-//     // Set the active script ID to the ID returned from the backend
-//     if (file.fileId && file.fileId.startsWith("file_") === false) {
-//       setActiveScriptId(file.fileId);
-//     }
-//     // Insert extracted text into editor
-//     if (file.extractedText && editorRef.current) {
-//       editorRef.current.innerHTML += `<hr/><p><strong>📎 ${file.fileName}</strong></p><p>${file.extractedText}</p>`;
-//       triggerSave();
-//       countWords();
-//     }
-//   }, [triggerSave, countWords]);
-
-//   // ─── Loading / Not found states ──────────────────────────────────────────────
-//   if (notFound) {
-//     return (
-//       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#faf7f4", flexDirection: "column", gap: "1rem" }}>
-//         <div style={{ fontSize: "3rem" }}>🔍</div>
-//         <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.5rem", color: "#1a1510" }}>Project not found</h2>
-//         <button onClick={() => router.push("/projects")} style={{ padding: "0.6rem 1.2rem", borderRadius: "10px", border: "none", background: "#1a1510", color: "#fff", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-//           ← Back to Projects
-//         </button>
-//       </div>
-//     );
-//   }
-
-//   if (!project) {
-//     return (
-//       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#faf7f4" }}>
-//         <div style={{ width: "32px", height: "32px", borderRadius: "50%", border: "3px solid #e8e2d9", borderTopColor: "#c96a3b", animation: "spin 0.8s linear infinite" }} />
-//         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <>
-//       <style>{`
-//         @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
-//         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-//         body { font-family: 'DM Sans', sans-serif; background: #faf7f4; }
-
-//         .editor-content { outline: none; min-height: 60vh; font-weight: 400; }
-//         .editor-content:empty::before { content: 'Type here…'; color: #b8b0a4; font-style: italic; font-weight: 400; }
-//         .editor-content h1 { font-family: 'DM Serif Display', serif; font-size: 2rem; margin-bottom: 1rem; font-weight: normal; }
-//         .editor-content h2 { font-family: 'DM Serif Display', serif; font-size: 1.5rem; margin-bottom: 0.75rem; font-weight: normal; }
-//         .editor-content h3 { font-family: 'DM Serif Display', serif; font-size: 1.2rem; margin-bottom: 0.5rem; font-weight: normal; }
-//         .editor-content p { margin-bottom: 1rem; }
-//         .editor-content ul, .editor-content ol { padding-left: 1.5rem; margin-bottom: 1rem; }
-//         .editor-content li { margin-bottom: 0.25rem; }
-//         .editor-content hr { border: none; border-top: 1px solid #e8e2d9; margin: 1.5rem 0; }
-
-//         @keyframes spin { to { transform: rotate(360deg); } }
-//         @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-//         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-
-//         ::-webkit-scrollbar { width: 6px; }
-//         ::-webkit-scrollbar-track { background: transparent; }
-//         ::-webkit-scrollbar-thumb { background: #d4cdc5; border-radius: 3px; }
-//       `}</style>
-
-//       {/* ── Top Navbar ─────────────────────────────────────────────────────── */}
-//       <nav style={{
-//         display: "flex", alignItems: "center",
-//         padding: "0 1.5rem", height: "52px",
-//         background: "rgba(250,247,244,0.95)", backdropFilter: "blur(12px)",
-//         borderBottom: "1px solid #e8e2d9",
-//         position: "sticky", top: 0, zIndex: 50,
-//         gap: "0.75rem",
-//       }}>
-//         {/* Back */}
-//         <button
-//           onClick={() => router.push("/projects")}
-//           style={{
-//             display: "flex", alignItems: "center", gap: "0.4rem",
-//             background: "none", border: "none", cursor: "pointer",
-//             color: "#9e9589", fontSize: "0.82rem", fontFamily: "'DM Sans', sans-serif",
-//             padding: "0.35rem 0.6rem", borderRadius: "7px", transition: "all 0.15s",
-//           }}
-//           onMouseEnter={e => { e.currentTarget.style.background = "#f0ebe3"; e.currentTarget.style.color = "#1a1510"; }}
-//           onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#9e9589"; }}
-//         >
-//           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
-//           Back
-//         </button>
-
-//         {/* Divider */}
-//         <div style={{ width: "1px", height: "20px", background: "#e8e2d9" }} />
-
-//         {/* Project name + emoji */}
-//         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-//           <span style={{ fontSize: "1rem" }}>{project.emoji}</span>
-//           <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "0.95rem", color: "#1a1510" }}>
-//             {project.title}
-//           </span>
-//         </div>
-
-//         {/* Spacer */}
-//         <div style={{ flex: 1 }} />
-
-
-
-//         <button
-//           onClick={() => router.push(`/projects/${projectId}/insight`)}
-//           style={{
-//             display: "flex", alignItems: "center", gap: "0.4rem",
-//             padding: "0.4rem 0.9rem", borderRadius: "8px",
-//             border: "1.5px solid #e8e2d9",
-//             background: "#fff",
-//             color: "#4a4540",
-//             fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem",
-//             cursor: "pointer", transition: "all 0.2s",
-//           }}
-//           onMouseEnter={(e) => {
-//             e.currentTarget.style.borderColor = "#c96a3b";
-//             e.currentTarget.style.color = "#c96a3b";
-//             e.currentTarget.style.background = "rgba(201,106,59,0.04)";
-//           }}
-//           onMouseLeave={(e) => {
-//             e.currentTarget.style.borderColor = "#e8e2d9";
-//             e.currentTarget.style.color = "#4a4540";
-//             e.currentTarget.style.background = "#fff";
-//           }}
-//         >
-//           🕸️ Insight
-//         </button>
-
-
-//         {/* Upload button */}
-//         <button
-//           onClick={() => setShowUploadPanel(!showUploadPanel)}
-//           style={{
-//             display: "flex", alignItems: "center", gap: "0.4rem",
-//             padding: "0.4rem 0.9rem", borderRadius: "8px",
-//             border: showUploadPanel ? "1.5px solid #c96a3b" : "1.5px solid #e8e2d9",
-//             background: showUploadPanel ? "rgba(201,106,59,0.06)" : "#fff",
-//             color: showUploadPanel ? "#c96a3b" : "#4a4540",
-//             fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem",
-//             cursor: "pointer", transition: "all 0.15s",
-//           }}
-//         >
-//           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-//             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17,8 12,3 7,8" /><line x1="12" y1="3" x2="12" y2="15" />
-//           </svg>
-//           Upload {uploadedFiles.length > 0 && `(${uploadedFiles.length})`}
-//         </button>
-
-//         {/* Word count + save */}
-//         <span style={{ fontSize: "0.78rem", color: "#9e9589" }}>
-//           {wordCount.toLocaleString()} words
-//         </span>
-//         <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.78rem", color: isSaved ? "#27ae60" : "#9e9589" }}>
-//           {isSaved
-//             ? <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20,6 9,17 4,12" /></svg>Saved</>
-//             : <><div style={{ width: "8px", height: "8px", borderRadius: "50%", border: "2px solid #9e9589", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />Saving…</>
-//           }
-//         </div>
-
-//         {/* Settings */}
-//         <button style={{ width: "30px", height: "30px", borderRadius: "8px", border: "none", background: "transparent", cursor: "pointer", color: "#9e9589", display: "flex", alignItems: "center", justifyContent: "center" }}>
-//           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-//             <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-//           </svg>
-//         </button>
-//       </nav>
-
-//       {/* ── Body: 3-column layout ──────────────────────────────────────────── */}
-//       <div style={{ display: "flex", height: "calc(100vh - 52px)", overflow: "hidden" }}>
-
-//         {/* LEFT SIDEBAR */}
-//         <LeftSidebar
-//           projectTitle={project.title}
-//           projectEmoji={project.emoji}
-//           onBack={() => router.push("/projects")}
-//           collapsed={sidebarCollapsed}
-//           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-//         />
-
-//         {/* CENTER: Editor */}
-//         <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
-
-//           {/* Formatting toolbar */}
-//           <EditorToolbar
-//             wordCount={wordCount}
-//             isSaved={isSaved}
-//             onFormat={handleFormat}
-//             onUndo={handleUndo}
-//             onRedo={handleRedo}
-//           />
-
-//           {/* Upload panel (collapsible) */}
-//           {showUploadPanel && (
-//             <div style={{
-//               padding: "1rem 2rem",
-//               borderBottom: "1px solid #e8e2d9",
-//               background: "#fdf9f6",
-//               animation: "fadeUp 0.2s ease both",
-//             }}>
-//               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
-//                 <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1rem", color: "#1a1510" }}>
-//                   Upload Files
-//                 </h3>
-//                 <p style={{ fontSize: "0.75rem", color: "#9e9589" }}>
-//                   Extracted text will be inserted into your document
-//                 </p>
-//               </div>
-//               <FileUploadZone projectId={projectId} onUpload={handleFileUpload} />
-//             </div>
-//           )}
-
-//           {/* Scrollable editor area */}
-//           <div style={{ flex: 1, overflowY: "auto", padding: "2rem 3rem" }}>
-//             {/* Document title */}
-//             <input
-//               value={docTitle}
-//               onChange={e => setDocTitle(e.target.value)}
-//               placeholder="Untitled"
-//               style={{
-//                 width: "100%", border: "none", outline: "none",
-//                 background: "transparent",
-//                 fontFamily: "'DM Serif Display', serif",
-//                 fontSize: "2rem", letterSpacing: "-0.03em",
-//                 color: "#1a1510", marginBottom: "0.5rem",
-//                 caretColor: "#c96a3b",
-//               }}
-//             />
-
-//             {/* <div style={{ marginTop: "2rem", paddingBottom: "3rem" }}>
-//   <KnowledgeGraph
-//     projectId={projectId}
-//     editorContent={editorRef.current?.innerText || ""}
-//   />
-
-// </div> */}
-
-//             {/* Brainstorm suggestions from AI */}
-//             {aiResult?.suggestions && aiResult.suggestions.length > 0 && (
-//               <div style={{
-//                 padding: "1rem 1.25rem", borderRadius: "12px",
-//                 background: "#fffbf0", border: "1px solid #f5e6a3",
-//                 marginBottom: "1.5rem", animation: "fadeUp 0.3s ease both",
-//               }}>
-//                 <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "#9e6800", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
-//                   💡 Brainstorm Ideas
-//                 </p>
-//                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-//                   {aiResult.suggestions.map((s, i) => (
-//                     <div
-//                       key={i}
-//                       onClick={() => {
-//                         if (editorRef.current) {
-//                           editorRef.current.innerHTML += `<p>${s}</p>`;
-//                           triggerSave();
-//                         }
-//                       }}
-//                       style={{
-//                         padding: "0.55rem 0.75rem", borderRadius: "8px",
-//                         background: "#fff", border: "1px solid #f0e6a0",
-//                         fontSize: "0.83rem", color: "#1a1510", cursor: "pointer",
-//                         transition: "all 0.15s", lineHeight: 1.5,
-//                       }}
-//                       onMouseEnter={e => { e.currentTarget.style.borderColor = "#c96a3b"; e.currentTarget.style.background = "#fffaf0"; }}
-//                       onMouseLeave={e => { e.currentTarget.style.borderColor = "#f0e6a0"; e.currentTarget.style.background = "#fff"; }}
-//                     >
-//                       {s}
-//                       <span style={{ fontSize: "0.7rem", color: "#c96a3b", marginLeft: "0.5rem" }}>↗ Insert</span>
-//                     </div>
-//                   ))}
-//                 </div>
-//                 <button onClick={() => setAiResult(null)} style={{ marginTop: "0.5rem", background: "none", border: "none", fontSize: "0.72rem", color: "#9e9589", cursor: "pointer" }}>
-//                   Dismiss
-//                 </button>
-//               </div>
-//             )}
-
-//             {/* AI Loading overlay */}
-//             {aiLoading && (
-//               <div style={{
-//                 padding: "1rem 1.25rem", borderRadius: "12px",
-//                 background: "#fdf9f6", border: "1px solid #e8e2d9",
-//                 marginBottom: "1.5rem",
-//                 display: "flex", alignItems: "center", gap: "0.75rem",
-//                 animation: "pulse 1.5s ease infinite",
-//               }}>
-//                 <div style={{ width: "16px", height: "16px", borderRadius: "50%", border: "2.5px solid #e8e2d9", borderTopColor: "#c96a3b", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
-//                 <span style={{ fontSize: "0.83rem", color: "#9e9589" }}>AI is thinking…</span>
-//               </div>
-//             )}
-
-//             {/* Rich text editor */}
-//             <div
-//               ref={editorRef}
-//               contentEditable
-//               suppressContentEditableWarning
-//               className="editor-content"
-//               onInput={handleEditorInput}
-//               onKeyDown={handleKeyDown}
-//               style={{
-//                 fontFamily: "'DM Serif Display', serif",
-//                 fontSize: "1.1rem", lineHeight: 1.85,
-//                 color: "#1a1510", caretColor: "#c96a3b",
-//                 minHeight: "60vh", outline: "none",
-//               }}
-//             />
-//           </div>
-
-//           {/* AI Action Bar */}
-//           <AIActionBar
-//             onAction={handleAIAction}
-//             loading={aiLoading}
-//             hasSelection={hasSelection}
-//           />
-//         </main>
-
-//         {/* RIGHT SIDEBAR: AI Chat */}
-//         <RightSidebar
-//           projectId={projectId}
-//           editorContent={editorRef.current?.innerText || ""}
-//           aiResult={aiResult && !aiResult.suggestions ? aiResult : null}
-//           onClearResult={() => setAiResult(null)}
-//         />
-//       </div>
-//     </>
-//   );
-// }
 
 
 
 
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { callAIAction, saveProject, UploadResponse, generateComicImage, ComicResult } from "@/lib/api";
 import { recordCommit, CommitType } from "@/lib/commits";
@@ -591,6 +57,7 @@ export default function ProjectEditorPage() {
   const router = useRouter();
   const projectId = params.id as string;
   const editorRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const [project, setProject] = useState<Project | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -604,6 +71,7 @@ export default function ProjectEditorPage() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadResponse[]>([]);
   const [activeScriptId, setActiveScriptId] = useState<string | null>(null);
   const [docTitle, setDocTitle] = useState("Untitled");
+  const [activeChapterId, setActiveChapterId] = useState("ch-1");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Comic generation state
@@ -705,6 +173,152 @@ export default function ProjectEditorPage() {
     setWordCount(words);
     return words;
   }, []);
+
+  // ─── Smart chapter detection ─────────────────────────────────────────────────
+  // Threshold: 5,000 words — used for fallback splits AND sub-splitting oversized chapters
+  const CHAPTER_WORD_THRESHOLD = 5000;
+
+  const chapters = useMemo(() => {
+    const text = editorRef.current?.innerText || "";
+    if (!text.trim()) {
+      return [{ id: "ch-1", title: "Chapter 1", wordCount: 0, charStart: 0 }];
+    }
+
+    // ── 1. Try to detect chapter markers in the text ──────────────────────────
+    // Matches patterns like: "Chapter 1", "CHAPTER II", "Chapter One", "chapter 23", etc.
+    const chapterPattern = /^[\s]*(?:chapter)\s+(\d+|[ivxlcdm]+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)(?:\s*[:\-–—.].*)?$/gim;
+
+    const markers: { title: string; charStart: number }[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = chapterPattern.exec(text)) !== null) {
+      // Clean up the matched title
+      const rawTitle = match[0].trim();
+      // Capitalize nicely: "chapter 1" → "Chapter 1"
+      const title = rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1);
+      markers.push({ title, charStart: match.index });
+    }
+
+    // ── Helper: count words in a substring ────────────────────────────────────
+    const countWordsInRange = (start: number, end: number) =>
+      text.slice(start, end).trim().split(/\s+/).filter(Boolean).length;
+
+    // ── Helper: sub-split a chapter if it exceeds the threshold ───────────────
+    const subSplit = (
+      baseId: string,
+      baseTitle: string,
+      charStart: number,
+      charEnd: number,
+    ): { id: string; title: string; wordCount: number; charStart: number }[] => {
+      const totalWords = countWordsInRange(charStart, charEnd);
+      if (totalWords <= CHAPTER_WORD_THRESHOLD) {
+        return [{ id: baseId, title: baseTitle, wordCount: totalWords, charStart }];
+      }
+      // Split into parts of ~CHAPTER_WORD_THRESHOLD words
+      const parts: { id: string; title: string; wordCount: number; charStart: number }[] = [];
+      let partStart = charStart;
+      let partNum = 1;
+      while (partStart < charEnd) {
+        // Walk forward CHAPTER_WORD_THRESHOLD words from partStart
+        let wc = 0;
+        let pos = partStart;
+        for (; pos < charEnd && wc < CHAPTER_WORD_THRESHOLD; pos++) {
+          if (/\s/.test(text[pos]) && pos > partStart && !/\s/.test(text[pos - 1])) {
+            wc++;
+          }
+        }
+        const partEnd = pos >= charEnd ? charEnd : pos;
+        const partWords = countWordsInRange(partStart, partEnd);
+        const suffix = totalWords > CHAPTER_WORD_THRESHOLD ? ` — Part ${partNum}` : "";
+        parts.push({
+          id: `${baseId}-p${partNum}`,
+          title: `${baseTitle}${suffix}`,
+          wordCount: partWords,
+          charStart: partStart,
+        });
+        partStart = partEnd;
+        partNum++;
+      }
+      return parts;
+    };
+
+    // ── 2. Build chapter list ─────────────────────────────────────────────────
+    let result: { id: string; title: string; wordCount: number; charStart: number }[] = [];
+
+    if (markers.length > 0) {
+      // ── Marker-based chapters ──────────────────────────────────────────────
+      for (let i = 0; i < markers.length; i++) {
+        const start = markers[i].charStart;
+        const end = i + 1 < markers.length ? markers[i + 1].charStart : text.length;
+        const parts = subSplit(`ch-${i + 1}`, markers[i].title, start, end);
+        result.push(...parts);
+      }
+
+      // If there's content before the first marker, prepend it as "Preamble"
+      if (markers[0].charStart > 0) {
+        const preambleWords = countWordsInRange(0, markers[0].charStart);
+        if (preambleWords > 5) {
+          result.unshift({
+            id: "ch-preamble",
+            title: "Preamble",
+            wordCount: preambleWords,
+            charStart: 0,
+          });
+        }
+      }
+    } else {
+      // ── Fallback: word-count-based chapters ────────────────────────────────
+      const totalWords = wordCount;
+      const totalChapters = Math.max(1, Math.ceil(totalWords / CHAPTER_WORD_THRESHOLD));
+
+      let chStart = 0;
+      for (let i = 0; i < totalChapters; i++) {
+        const targetWords = CHAPTER_WORD_THRESHOLD;
+        let wc = 0;
+        let pos = chStart;
+        for (; pos < text.length && wc < targetWords; pos++) {
+          if (/\s/.test(text[pos]) && pos > chStart && !/\s/.test(text[pos - 1])) {
+            wc++;
+          }
+        }
+        const chEnd = i === totalChapters - 1 ? text.length : pos;
+        const chapterWords = countWordsInRange(chStart, chEnd);
+        result.push({
+          id: `ch-${i + 1}`,
+          title: totalChapters === 1 ? "Chapter 1" : `Chapter ${i + 1}`,
+          wordCount: chapterWords,
+          charStart: chStart,
+        });
+        chStart = chEnd;
+      }
+    }
+
+    return result;
+  }, [wordCount]);
+
+  // ─── Scroll editor to chapter position on click ─────────────────────────────
+  const handleChapterClick = useCallback((chapterId: string) => {
+    setActiveChapterId(chapterId);
+    if (!editorRef.current || !scrollContainerRef.current) return;
+
+    // Find the chapter object to get its charStart
+    const chapter = chapters.find(ch => ch.id === chapterId);
+    if (!chapter) return;
+
+    const container = scrollContainerRef.current;
+
+    if (chapter.charStart === 0) {
+      container.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    // Scroll proportionally based on character position
+    const text = editorRef.current.innerText || "";
+    const scrollRatio = chapter.charStart / Math.max(text.length, 1);
+    container.scrollTo({
+      top: scrollRatio * container.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [chapters]);
 
   // ─── Selection tracking ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -925,6 +539,8 @@ export default function ProjectEditorPage() {
         .editor-content ul, .editor-content ol { padding-left: 1.5rem; margin-bottom: 1rem; }
         .editor-content li { margin-bottom: 0.25rem; }
         .editor-content hr { border: none; border-top: 1px solid #e8e2d9; margin: 1.5rem 0; }
+        .editor-content::selection, .editor-content *::selection { background: rgba(4,120,87,0.2); color: inherit; }
+        .editor-content::-moz-selection, .editor-content *::-moz-selection { background: rgba(4,120,87,0.2); color: inherit; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
@@ -1037,6 +653,9 @@ export default function ProjectEditorPage() {
           onBack={() => router.push("/projects")}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          chapters={chapters}
+          activeChapterId={activeChapterId}
+          onChapterClick={handleChapterClick}
         />
 
         <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
@@ -1056,7 +675,7 @@ export default function ProjectEditorPage() {
             </div>
           )}
 
-          <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem 2rem" }}>
+          <div ref={scrollContainerRef} style={{ flex: 1, overflowY: "auto", padding: "1.5rem 2rem" }}>
             <div style={{
               background: "#fff", borderRadius: "16px",
               boxShadow: "0 2px 16px rgba(0,0,0,0.05), 0 1px 4px rgba(0,0,0,0.03)",
@@ -1154,3 +773,4 @@ export default function ProjectEditorPage() {
     </>
   );
 }
+
